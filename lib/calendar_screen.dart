@@ -11,6 +11,9 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  CalendarView _currentView = CalendarView.week;
+  final CalendarController _calendarController = CalendarController();
+
   @override
   Widget build(BuildContext context) {
     final groupeController = Provider.of<GroupeController>(context);
@@ -21,6 +24,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       for (var groupe in groupes) {
         List<DateTime> occurrences = _getAllOccurrences(groupe.jour);
         for (var occurrence in occurrences) {
+          String dayName = _getDayName(occurrence.weekday);
           appointments.add(Appointment(
             startTime: DateTime(
                 occurrence.year,
@@ -30,7 +34,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 groupe.heureDebut.minute),
             endTime: DateTime(occurrence.year, occurrence.month, occurrence.day,
                 groupe.heureFin.hour, groupe.heureFin.minute),
-            subject: groupe.nom,
+            subject: '${groupe.nom} - $dayName',
             color: Colors.blue,
             notes: groupe.id,
           ));
@@ -40,8 +44,38 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     return Scaffold(
+      appBar: AppBar(
+        title: Text('Calendrier'),
+        actions: [
+          PopupMenuButton<CalendarView>(
+            icon: Icon(Icons.view_column),
+            onSelected: (CalendarView view) {
+              setState(() {
+                _currentView = view;
+                _calendarController.view = view;
+              });
+            },
+            itemBuilder: (BuildContext context) =>
+                <PopupMenuEntry<CalendarView>>[
+              PopupMenuItem<CalendarView>(
+                value: CalendarView.week,
+                child: Text('Vue Semaine'),
+              ),
+              PopupMenuItem<CalendarView>(
+                value: CalendarView.month,
+                child: Text('Vue Mois'),
+              ),
+              PopupMenuItem<CalendarView>(
+                value: CalendarView.day,
+                child: Text('Vue Jour'),
+              ),
+            ],
+          ),
+        ],
+      ),
       body: SfCalendar(
-        view: CalendarView.week,
+        controller: _calendarController,
+        view: _currentView,
         dataSource: MeetingDataSource(_getDataSource()),
         timeSlotViewSettings: TimeSlotViewSettings(
           startHour: 7,
@@ -52,6 +86,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           dayTextStyle: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
         ),
         monthViewSettings: MonthViewSettings(
@@ -59,8 +94,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
         headerDateFormat: 'MMMM yyyy',
         todayHighlightColor: Colors.blue,
-        firstDayOfWeek: 1, // Lundi
-
+        firstDayOfWeek: 1,
         onTap: (CalendarTapDetails details) {
           if (details.appointments != null &&
               details.appointments!.isNotEmpty) {
@@ -104,6 +138,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     return occurrences;
+  }
+
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case DateTime.monday:
+        return 'Lundi';
+      case DateTime.tuesday:
+        return 'Mardi';
+      case DateTime.wednesday:
+        return 'Mercredi';
+      case DateTime.thursday:
+        return 'Jeudi';
+      case DateTime.friday:
+        return 'Vendredi';
+      case DateTime.saturday:
+        return 'Samedi';
+      case DateTime.sunday:
+        return 'Dimanche';
+      default:
+        return '';
+    }
   }
 }
 
