@@ -65,4 +65,10 @@ class GroupeController with ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> supprimerGroupe(String groupeId) async {
+    await _databaseService.deleteGroupe(groupeId);
+    _groupes.removeWhere((groupe) => groupe.id == groupeId);
+    notifyListeners();
+  }
 }

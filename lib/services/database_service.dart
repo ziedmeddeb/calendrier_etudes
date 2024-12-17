@@ -101,4 +101,18 @@ class DatabaseService {
       whereArgs: [etudiant.id],
     );
   }
+
+  Future<void> deleteGroupe(String groupeId) async {
+    final db = await database;
+    await db.delete(
+      'groupes',
+      where: 'id = ?',
+      whereArgs: [groupeId],
+    );
+    await db.delete(
+      'etudiants',
+      where: 'groupeId = ?',
+      whereArgs: [groupeId],
+    );
+  }
 }
