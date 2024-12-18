@@ -1,3 +1,5 @@
+import 'package:calendrier_etude/models/etudiant_presence.dart';
+import 'package:calendrier_etude/models/seance.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:flutter/material.dart';
@@ -114,5 +116,67 @@ class DatabaseService {
       where: 'groupeId = ?',
       whereArgs: [groupeId],
     );
+  }
+
+  Future<void> insertSeance(Seance seance) async {
+    final db = await database;
+    await db.insert(
+      'seances',
+      seance.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    for (var presence in seance.presences) {
+      await db.insert(
+        'seance_etudiants',
+        presence.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<void> updateSeance(Seance seance) async {
+    final db = await database;
+    await db.update(
+      'seances',
+      seance.toMap(),
+      where: 'id = ?',
+      whereArgs: [seance.id],
+    );
+    await db.delete(
+      'seance_etudiants',
+      where: 'seanceId = ?',
+      whereArgs: [seance.id],
+    );
+    for (var presence in seance.presences) {
+      await db.insert(
+        'seance_etudiants',
+        presence.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<Seance> getSeance(String seanceId, Groupe groupe) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'seances',
+      where: 'id = ?',
+      whereArgs: [seanceId],
+    );
+    if (maps.isNotEmpty) {
+      final seanceMap = maps.first;
+      final List<Map<String, dynamic>> presenceMaps = await db.query(
+        'seance_etudiants',
+        where: 'seanceId = ?',
+        whereArgs: [seanceId],
+      );
+      final presences = List<EtudiantPresence>.from(
+        presenceMaps
+            .map((presenceMap) => EtudiantPresence.fromMap(presenceMap)),
+      );
+      return Seance.fromMap(seanceMap, groupe)..presences = presences;
+    } else {
+      throw Exception('Seance not found');
+    }
   }
 }

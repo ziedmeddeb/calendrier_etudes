@@ -1,8 +1,12 @@
+import 'package:calendrier_etude/models/etudiant_presence.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
+
 import 'controllers/groupe_controller.dart';
+import 'controllers/absence_controller.dart';
 import 'models/groupe.dart';
+import 'models/seance.dart';
 import 'attendance_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -16,7 +20,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final groupeController = Provider.of<GroupeController>(context);
+    // Use context.watch to safely access providers
+    final groupeController = context.watch<GroupeController>();
+    final absenceController = context.watch<AbsenceController>();
     final groupes = groupeController.groupes;
 
     List<Appointment> _getDataSource() {
@@ -101,10 +107,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
             final appointment = details.appointments!.first as Appointment;
             final groupeId = appointment.notes;
             final groupe = groupes.firstWhere((g) => g.id == groupeId);
+
+            // Create a new seance when tapping a group's time slot
+            Seance newSeance = Seance(
+              id: DateTime.now().toString(), // Generate unique ID
+              groupe: groupe,
+              date: details.date ?? DateTime.now(),
+              presences: groupe.etudiants
+                  .map((etudiant) => EtudiantPresence(etudiantId: etudiant.id))
+                  .toList(),
+            );
+
+            absenceController.ajouterSeance(newSeance);
+
             Navigator.push(
               context,
               MaterialPageRoute(
-                  builder: (context) => AttendanceScreen(groupe: groupe)),
+                builder: (context) =>
+                    AttendanceScreen(groupe: groupe, seance: newSeance),
+              ),
             );
           }
         },
