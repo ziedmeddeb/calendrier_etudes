@@ -25,7 +25,6 @@ class DatabaseService {
       path,
       version: 3, // Incremented version
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
     );
   }
 
@@ -53,43 +52,14 @@ class DatabaseService {
       )
     ''');
 
-    // Create seances table
     await db.execute('''
-      CREATE TABLE seances(
+      CREATE TABLE seances (
         id TEXT PRIMARY KEY,
-        groupeId TEXT,
         date TEXT,
-        FOREIGN KEY(groupeId) REFERENCES groupes(id)
-      )
-    ''');
-
-    // Create seance_etudiants table
-    await db.execute('''
-      CREATE TABLE seance_etudiants(
-        seanceId TEXT,
         etudiantId TEXT,
-        present INTEGER,
-        PRIMARY KEY(seanceId, etudiantId),
-        FOREIGN KEY(seanceId) REFERENCES seances(id),
-        FOREIGN KEY(etudiantId) REFERENCES etudiants(id)
+        present INTEGER
       )
     ''');
-  }
-
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Add seance_etudiants table if missing
-    if (oldVersion < 3) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS seance_etudiants(
-          seanceId TEXT,
-          etudiantId TEXT,
-          present INTEGER,
-          PRIMARY KEY(seanceId, etudiantId),
-          FOREIGN KEY(seanceId) REFERENCES seances(id),
-          FOREIGN KEY(etudiantId) REFERENCES etudiants(id)
-        )
-      ''');
-    }
   }
 
   Future<void> insertGroupe(Groupe groupe, BuildContext context) async {
@@ -167,13 +137,6 @@ class DatabaseService {
       seance.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    for (var presence in seance.presences) {
-      await db.insert(
-        'seance_etudiants',
-        presence.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
   }
 
   Future<void> updateSeance(Seance seance) async {
@@ -189,36 +152,31 @@ class DatabaseService {
       where: 'seanceId = ?',
       whereArgs: [seance.id],
     );
-    for (var presence in seance.presences) {
-      await db.insert(
-        'seance_etudiants',
-        presence.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-    }
   }
 
-  Future<Seance> getSeance(String seanceId, Groupe groupe) async {
+  Future<List<Seance>> getSeancesByDate(DateTime date) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'seances',
-      where: 'id = ?',
-      whereArgs: [seanceId],
+      where: 'date = ?',
+      whereArgs: [date.toIso8601String()],
     );
-    if (maps.isNotEmpty) {
-      final seanceMap = maps.first;
-      final List<Map<String, dynamic>> presenceMaps = await db.query(
-        'seance_etudiants',
-        where: 'seanceId = ?',
-        whereArgs: [seanceId],
-      );
-      final presences = List<EtudiantPresence>.from(
-        presenceMaps
-            .map((presenceMap) => EtudiantPresence.fromMap(presenceMap)),
-      );
-      return Seance.fromMap(seanceMap, groupe)..presences = presences;
-    } else {
-      throw Exception('Seance not found');
-    }
+
+    return List.generate(maps.length, (i) {
+      return Seance.fromMap(maps[i]);
+    });
+  }
+
+  Future<void> deleteDatabaseAndRecreate() async {
+    // Get the path to the database
+    String path = join(await getDatabasesPath(), 'app_database.db');
+
+    // Delete the database
+    await deleteDatabase(path);
+    print('Database deleted.');
+
+    // Reopen the database, which will recreate it
+    _database = await _initDatabase();
+    print('Database recreated.');
   }
 }

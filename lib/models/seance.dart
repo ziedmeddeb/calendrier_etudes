@@ -1,34 +1,33 @@
-import 'groupe.dart';
-import 'etudiant_presence.dart';
+import 'package:calendrier_etude/models/groupe.dart';
 
 class Seance {
   String id;
-  Groupe groupe;
   DateTime date;
-  List<EtudiantPresence> presences;
+  String etudiantId;
+  bool present;
 
   Seance({
     required this.id,
-    required this.groupe,
     required this.date,
-    required this.presences,
+    required this.etudiantId,
+    required this.present,
   });
 
-  // Optional: Add toMap and fromMap methods for database serialization
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'groupeId': groupe.id,
       'date': date.toIso8601String(),
+      'etudiantId': etudiantId,
+      'present': present ? 1 : 0,
     };
   }
 
-  static Seance fromMap(Map<String, dynamic> map, Groupe groupe) {
+  static Seance fromMap(Map<String, dynamic> map) {
     return Seance(
       id: map['id'],
-      groupe: groupe,
       date: DateTime.parse(map['date']),
-      presences: [], // You might want to populate this separately
+      etudiantId: map['etudiantId'],
+      present: map['present'] == 1,
     );
   }
 }

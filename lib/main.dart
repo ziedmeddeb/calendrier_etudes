@@ -1,13 +1,19 @@
+import 'package:calendrier_etude/services/database_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'controllers/groupe_controller.dart';
-import 'controllers/absence_controller.dart';
-import 'services/absence_service.dart';
+
 import 'calendar_screen.dart';
 import 'group_management_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Delete and recreate the database
+  await DatabaseService().deleteDatabaseAndRecreate();
+
+  print('Database has been recreated.');
   runApp(MyApp());
 }
 
@@ -17,8 +23,6 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => GroupeController(context)),
-        ChangeNotifierProvider(
-            create: (_) => AbsenceController(AbsenceService())),
       ],
       child: MaterialApp(
         localizationsDelegates: [

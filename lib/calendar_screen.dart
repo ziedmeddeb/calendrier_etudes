@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 
 import 'controllers/groupe_controller.dart';
-import 'controllers/absence_controller.dart';
 import 'models/groupe.dart';
 import 'models/seance.dart';
 import 'attendance_screen.dart';
@@ -22,7 +21,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget build(BuildContext context) {
     // Use context.watch to safely access providers
     final groupeController = context.watch<GroupeController>();
-    final absenceController = context.watch<AbsenceController>();
+
     final groupes = groupeController.groupes;
 
     List<Appointment> _getDataSource() {
@@ -108,23 +107,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
             final groupeId = appointment.notes;
             final groupe = groupes.firstWhere((g) => g.id == groupeId);
 
-            // Create a new seance when tapping a group's time slot
-            Seance newSeance = Seance(
-              id: DateTime.now().toString(), // Generate unique ID
-              groupe: groupe,
-              date: details.date ?? DateTime.now(),
-              presences: groupe.etudiants
-                  .map((etudiant) => EtudiantPresence(etudiantId: etudiant.id))
-                  .toList(),
-            );
-
-            absenceController.ajouterSeance(newSeance);
-
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) =>
-                    AttendanceScreen(groupe: groupe, seance: newSeance),
+                builder: (context) => AttendanceScreen(
+                    groupe: groupe, date: details.date ?? DateTime.now()),
               ),
             );
           }
