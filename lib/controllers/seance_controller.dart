@@ -1,23 +1,52 @@
-import 'package:flutter/material.dart';
-import '../models/seance.dart';
-import '../models/groupe.dart';
-import '../services/database_service.dart';
+import 'package:calendrier_etude/models/groupe.dart';
+import 'package:calendrier_etude/models/seance.dart';
+import 'package:calendrier_etude/services/absence_service.dart';
+import 'package:flutter/foundation.dart';
 
-class SeanceController with ChangeNotifier {
-  final DatabaseService _databaseService = DatabaseService();
+class AbsenceController with ChangeNotifier {
+  final AbsenceService _absenceService;
+
+  AbsenceController(this._absenceService);
 
   Future<void> ajouterSeance(Seance seance) async {
-    await _databaseService.insertSeance(seance);
-    notifyListeners();
+    try {
+      await _absenceService.insertSeance(seance);
+      print('Seance added successfully: ${seance.id}');
+      notifyListeners();
+    } catch (e) {
+      print('Error adding seance: $e');
+    }
+  }
+
+  // New method to update the entire seance
+  Future<void> updateSeance(Seance seance) async {
+    try {
+      await _absenceService.updateSeance(seance);
+      print('Seance updated successfully: ${seance.id}');
+      notifyListeners();
+    } catch (e) {
+      print('Error updating seance: $e');
+      rethrow;
+    }
   }
 
   Future<void> marquerPresence(
       String seanceId, String etudiantId, bool present, Groupe groupe) async {
-    final seance = await _databaseService.getSeance(seanceId, groupe);
-    final presence =
-        seance.presences.firstWhere((p) => p.etudiantId == etudiantId);
-    presence.present = present;
-    await _databaseService.updateSeance(seance);
-    notifyListeners();
+    try {
+      // Fetch the current seance
+      final seance = await _absenceService.getSeance(seanceId, groupe);
+
+      // Find and update the specific student's presence
+      final presence =
+          seance.presences.firstWhere((p) => p.etudiantId == etudiantId);
+      presence.present = present;
+
+      // Update the seance in the database
+      await _absenceService.updateSeance(seance);
+
+      notifyListeners();
+    } catch (e) {
+      print('Error marking presence: $e');
+    }
   }
 }

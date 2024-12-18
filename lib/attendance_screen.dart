@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'controllers/absence_controller.dart';
 import 'models/groupe.dart';
 import 'models/seance.dart';
+import 'models/etudiant_presence.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final Groupe groupe;
@@ -17,17 +18,42 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
   late Seance _seance;
+  bool _hasChanges = false;
 
   @override
   void initState() {
     super.initState();
-    // Create a copy of the seance to allow local modifications
+    // Create a deep copy of the seance to allow local modifications
     _seance = Seance(
       id: widget.seance.id,
       groupe: widget.seance.groupe,
       date: widget.seance.date,
-      presences: List.from(widget.seance.presences),
+      presences: widget.seance.presences
+          .map((p) =>
+              EtudiantPresence(etudiantId: p.etudiantId, present: p.present))
+          .toList(),
     );
+  }
+
+  void _saveAttendance(AbsenceController absenceController) async {
+    try {
+      // Explicitly save the entire seance
+      await absenceController.updateSeance(_seance);
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Présence enregistrée avec succès'),
+        backgroundColor: Colors.green,
+      ));
+
+      setState(() {
+        _hasChanges = false;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Erreur lors de l\'enregistrement : $e'),
+        backgroundColor: Colors.red,
+      ));
+    }
   }
 
   @override
@@ -62,13 +88,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                           value: presence.present,
                           onChanged: (bool? value) {
                             if (value != null) {
+                              // Update local state
                               setState(() {
                                 presence.present = value;
+                                _hasChanges = true;
                               });
-
-                              // Update the seance in the database
-                              absenceController.marquerPresence(_seance.id,
-                                  etudiant.id, value, widget.groupe);
                             }
                           },
                         ),
@@ -76,6 +100,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     },
                   );
                 },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: _hasChanges
+                    ? () => _saveAttendance(context.read<AbsenceController>())
+                    : null,
+                child: Text('Enregistrer les présences'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: Size(double.infinity, 50),
+                ),
               ),
             ),
           ],

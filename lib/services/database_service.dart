@@ -23,12 +23,14 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'app_database.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 3, // Incremented version
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
+    // Create groupes table
     await db.execute('''
       CREATE TABLE groupes(
         id TEXT PRIMARY KEY,
@@ -38,6 +40,8 @@ class DatabaseService {
         heureFin TEXT
       )
     ''');
+
+    // Create etudiants table
     await db.execute('''
       CREATE TABLE etudiants(
         id TEXT PRIMARY KEY,
@@ -48,6 +52,44 @@ class DatabaseService {
         FOREIGN KEY(groupeId) REFERENCES groupes(id)
       )
     ''');
+
+    // Create seances table
+    await db.execute('''
+      CREATE TABLE seances(
+        id TEXT PRIMARY KEY,
+        groupeId TEXT,
+        date TEXT,
+        FOREIGN KEY(groupeId) REFERENCES groupes(id)
+      )
+    ''');
+
+    // Create seance_etudiants table
+    await db.execute('''
+      CREATE TABLE seance_etudiants(
+        seanceId TEXT,
+        etudiantId TEXT,
+        present INTEGER,
+        PRIMARY KEY(seanceId, etudiantId),
+        FOREIGN KEY(seanceId) REFERENCES seances(id),
+        FOREIGN KEY(etudiantId) REFERENCES etudiants(id)
+      )
+    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Add seance_etudiants table if missing
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS seance_etudiants(
+          seanceId TEXT,
+          etudiantId TEXT,
+          present INTEGER,
+          PRIMARY KEY(seanceId, etudiantId),
+          FOREIGN KEY(seanceId) REFERENCES seances(id),
+          FOREIGN KEY(etudiantId) REFERENCES etudiants(id)
+        )
+      ''');
+    }
   }
 
   Future<void> insertGroupe(Groupe groupe, BuildContext context) async {

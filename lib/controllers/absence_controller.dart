@@ -9,22 +9,42 @@ class AbsenceController with ChangeNotifier {
   AbsenceController(this._absenceService);
 
   Future<void> ajouterSeance(Seance seance) async {
-    await _absenceService.insertSeance(seance);
-    notifyListeners();
+    try {
+      await _absenceService.insertSeance(seance);
+      print('Seance added successfully: ${seance.id}');
+      notifyListeners();
+    } catch (e) {
+      print('Error adding seance: $e');
+    }
   }
 
   Future<void> marquerPresence(
       String seanceId, String etudiantId, bool present, Groupe groupe) async {
-    // Fetch the current seance
-    final seance = await _absenceService.getSeance(seanceId, groupe);
+    try {
+      // Fetch the current seance
+      final seance = await _absenceService.getSeance(seanceId, groupe);
 
-    // Find and update the specific student's presence
-    final presence =
-        seance.presences.firstWhere((p) => p.etudiantId == etudiantId);
-    presence.present = present;
+      // Find and update the specific student's presence
+      final presence =
+          seance.presences.firstWhere((p) => p.etudiantId == etudiantId);
+      presence.present = present;
 
-    // Update the seance in the database
-    await _absenceService.updateSeance(seance);
-    notifyListeners();
+      // Update the seance in the database
+      await _absenceService.updateSeance(seance);
+
+      notifyListeners();
+    } catch (e) {
+      print('Error marking presence: $e');
+    }
+  }
+
+  // Add this method to update a seance
+  Future<void> updateSeance(Seance seance) async {
+    try {
+      await _absenceService.updateSeance(seance);
+    } catch (e) {
+      print('Error updating seance: $e');
+      rethrow;
+    }
   }
 }
