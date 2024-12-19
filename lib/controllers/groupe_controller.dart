@@ -42,13 +42,16 @@ class GroupeController with ChangeNotifier {
     notifyListeners();
   }
 
-  void supprimerEtudiantDuGroupe(String groupeId, String etudiantId) {
+  void supprimerEtudiantDuGroupe(String groupeId, String etudiantId) async {
+    await _databaseService.deleteEtudiantFromGroupe(groupeId, etudiantId);
     final groupe = _groupes.firstWhere((g) => g.id == groupeId);
     groupe.etudiants.removeWhere((etudiant) => etudiant.id == etudiantId);
     notifyListeners();
   }
 
-  void modifierEtudiantDuGroupe(String groupeId, Etudiant updatedEtudiant) {
+  void modifierEtudiantDuGroupe(
+      String groupeId, Etudiant updatedEtudiant) async {
+    await _databaseService.updateEtudiantInGroupe(groupeId, updatedEtudiant);
     final groupe = _groupes.firstWhere((g) => g.id == groupeId);
     final index = groupe.etudiants
         .indexWhere((etudiant) => etudiant.id == updatedEtudiant.id);
@@ -58,7 +61,8 @@ class GroupeController with ChangeNotifier {
     }
   }
 
-  void modifierGroupe(Groupe updatedGroupe) {
+  void modifierGroupe(Groupe updatedGroupe, BuildContext context) async {
+    await _databaseService.updateGroupe(updatedGroupe, context);
     final index = _groupes.indexWhere((g) => g.id == updatedGroupe.id);
     if (index != -1) {
       _groupes[index] = updatedGroupe;

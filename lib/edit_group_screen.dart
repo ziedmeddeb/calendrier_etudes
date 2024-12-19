@@ -55,7 +55,7 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
         heureFin: _selectedEndTime,
       );
       Provider.of<GroupeController>(context, listen: false)
-          .modifierGroupe(updatedGroupe);
+          .modifierGroupe(updatedGroupe, context);
       Navigator.pop(context);
     }
   }

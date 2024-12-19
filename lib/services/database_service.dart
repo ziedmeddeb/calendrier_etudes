@@ -252,4 +252,44 @@ class DatabaseService {
     if (maps.isEmpty) return null;
     return Etudiant.fromMap(maps.first);
   }
+
+  Future<void> deleteEtudiantFromGroupe(
+      String groupeId, String etudiantId) async {
+    final db = await database;
+    await db.delete(
+      'etudiants',
+      where: 'id = ? AND groupeId = ?',
+      whereArgs: [etudiantId, groupeId],
+    );
+  }
+
+  Future<void> updateEtudiantInGroupe(
+      String groupeId, Etudiant updatedEtudiant) async {
+    final db = await database;
+    await db.update(
+      'etudiants',
+      updatedEtudiant.toMap(groupeId),
+      where: 'id = ? AND groupeId = ?',
+      whereArgs: [updatedEtudiant.id, groupeId],
+    );
+  }
+
+  Future<void> updateGroupe(Groupe updatedGroupe, BuildContext context) async {
+    final db = await database;
+    await db.update(
+      'groupes',
+      updatedGroupe.toMap(context),
+      where: 'id = ?',
+      whereArgs: [updatedGroupe.id],
+    );
+  }
+
+  Future<void> removeExternalStudent(String studentId) async {
+    final db = await database;
+    await db.delete(
+      'seances',
+      where: 'etudiantId = ?',
+      whereArgs: [studentId],
+    );
+  }
 }

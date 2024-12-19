@@ -175,7 +175,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
-  void _removeExternalStudent(String studentId) {
+  void _removeExternalStudent(String studentId) async {
+    await _databaseService.removeExternalStudent(studentId);
     setState(() {
       _externalStudents.remove(studentId);
       _seanceMap.remove(studentId);
@@ -286,11 +287,21 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     if (_isLoading) return;
 
     setState(() {
-      final seance = _seanceMap[etudiantId];
-      if (seance != null) {
+      var seance = _seanceMap[etudiantId];
+      if (seance == null) {
+        // Create a new seance if one doesn't exist
+        seance = Seance(
+          id: Uuid().v4(),
+          date: widget.date,
+          etudiantId: etudiantId,
+          present:
+              true, // Start as present since we're creating it on first toggle
+        );
+        _seanceMap[etudiantId] = seance;
+      } else {
         seance.present = !seance.present;
-        _hasChanges = true;
       }
+      _hasChanges = true;
     });
   }
 
