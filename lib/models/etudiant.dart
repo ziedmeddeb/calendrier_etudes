@@ -28,4 +28,9 @@ class Etudiant {
       present: map['present'] == 1,
     );
   }
+
+  @override
+  String toString() {
+    return 'Etudiant{id: $id, nom: $nom, lycee: $lycee, present: $present}';
+  }
 }

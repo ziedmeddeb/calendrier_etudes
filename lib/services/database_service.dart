@@ -53,13 +53,13 @@ class DatabaseService {
     ''');
 
     await db.execute('''
-      CREATE TABLE seances (
-        id TEXT PRIMARY KEY,
-        date TEXT,
-        etudiantId TEXT,
-        present INTEGER
-      )
-    ''');
+  CREATE TABLE seances(
+    id TEXT PRIMARY KEY,
+    date TEXT NOT NULL,
+    etudiantId TEXT NOT NULL,
+    present INTEGER NOT NULL
+  )
+''');
   }
 
   Future<void> insertGroupe(Groupe groupe, BuildContext context) async {
@@ -130,16 +130,19 @@ class DatabaseService {
     );
   }
 
-  Future<void> insertSeance(Seance seance) async {
-    final db = await database;
-    await db.insert(
-      'seances',
-      seance.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
+  // Future<void> insertSeance(Seance seance) async {
+  //   print("insertSeance");
+  //   final db = await database;
+  //   print(seance.toMap());
+  //   await db.insert(
+  //     'seances',
+  //     seance.toMap(),
+  //     conflictAlgorithm: ConflictAlgorithm.replace,
+  //   );
+  // }
 
   Future<void> updateSeance(Seance seance) async {
+    print("updateSeance");
     final db = await database;
     await db.update(
       'seances',
@@ -156,16 +159,53 @@ class DatabaseService {
 
   Future<List<Seance>> getSeancesByDate(DateTime date) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'seances',
-      where: 'date = ?',
-      whereArgs: [date.toIso8601String()],
+
+    // Format the date to match SQLite date format (YYYY-MM-DD)
+    final String formattedDate =
+        "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+
+    print('Querying seances for date: $formattedDate'); // Debug log
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery(
+      'SELECT * FROM seances WHERE date(date) = date(?)',
+      [formattedDate],
     );
 
+    print('Found ${maps.length} seances'); // Debug log
+
     return List.generate(maps.length, (i) {
+      print('Seance ${i + 1}: ${maps[i]}'); // Debug log for each seance
       return Seance.fromMap(maps[i]);
     });
   }
+
+// When inserting a seance, make sure to format the date consistently
+  Future<void> insertSeance(Seance seance) async {
+    final db = await database;
+
+    // Format the date consistently
+    final String formattedDate =
+        "${seance.date.year.toString().padLeft(4, '0')}-${seance.date.month.toString().padLeft(2, '0')}-${seance.date.day.toString().padLeft(2, '0')}";
+
+    Map<String, dynamic> seanceMap = seance.toMap();
+    seanceMap['date'] = formattedDate;
+
+    await db.insert(
+      'seances',
+      seanceMap,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+  // Future<List<Seance>> getSeances() async {
+  //   final db = await database;
+  //   final List<Map<String, dynamic>> maps = await db.query(
+  //     'seances',
+  //   );
+
+  //   return List.generate(maps.length, (i) {
+  //     return Seance.fromMap(maps[i]);
+  //   });
+  // }
 
   Future<void> deleteDatabaseAndRecreate() async {
     // Get the path to the database
@@ -178,5 +218,38 @@ class DatabaseService {
     // Reopen the database, which will recreate it
     _database = await _initDatabase();
     print('Database recreated.');
+  }
+
+  Future<void> updateAttendance(
+      String etudiantId, bool present, DateTime date) async {
+    final db = await database;
+    await db.update(
+      'seances',
+      {'present': present ? 1 : 0},
+      where: 'etudiantId = ? AND date = ?',
+      whereArgs: [etudiantId, date.toIso8601String()],
+    );
+  }
+
+  Future<List<Etudiant>> getAllEtudiants() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('etudiants');
+
+    return List.generate(maps.length, (i) {
+      return Etudiant.fromMap(maps[i]);
+    });
+  }
+
+  Future<Etudiant?> getEtudiantById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'etudiants',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) return null;
+    return Etudiant.fromMap(maps.first);
   }
 }

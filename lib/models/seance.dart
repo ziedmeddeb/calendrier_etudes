@@ -1,9 +1,7 @@
-import 'package:calendrier_etude/models/groupe.dart';
-
 class Seance {
-  String id;
-  DateTime date;
-  String etudiantId;
+  final String id;
+  final DateTime date;
+  final String etudiantId;
   bool present;
 
   Seance({
@@ -16,13 +14,14 @@ class Seance {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'date': date.toIso8601String(),
+      'date':
+          "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}",
       'etudiantId': etudiantId,
       'present': present ? 1 : 0,
     };
   }
 
-  static Seance fromMap(Map<String, dynamic> map) {
+  factory Seance.fromMap(Map<String, dynamic> map) {
     return Seance(
       id: map['id'],
       date: DateTime.parse(map['date']),

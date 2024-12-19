@@ -16,6 +16,7 @@ dependencies:
   syncfusion_flutter_calendar: ^20.2.41
   sqflite: ^2.0.0+4
   path: ^1.8.0
+  uuid: ^3.0.7
   sqflite_common_ffi: ^2.0.0+1
   flutter_localizations:
     sdk: flutter

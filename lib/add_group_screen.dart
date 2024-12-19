@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 import 'controllers/groupe_controller.dart';
 import 'models/groupe.dart';
 
@@ -34,7 +35,7 @@ class _AddGroupScreenState extends State<AddGroupScreen> {
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
       final groupe = Groupe(
-        id: DateTime.now().toString(),
+        id: Uuid().v4(),
         nom: _groupNameController.text,
         etudiants: [],
         jour: _selectedDay,

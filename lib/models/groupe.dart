@@ -44,4 +44,9 @@ class Groupe {
       ),
     );
   }
+
+  @override
+  String toString() {
+    return 'Groupe{id: $id, nom: $nom, etudiants: $etudiants, jour: $jour, heureDebut: $heureDebut, heureFin: $heureFin}';
+  }
 }
