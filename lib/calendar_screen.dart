@@ -38,6 +38,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
+  Future<void> _deleteCustomSession(CustomSeance session) async {
+    final DatabaseService databaseService = DatabaseService();
+    await databaseService.deleteCustomSeance(session.id);
+    await _loadAppointments(); // Refresh appointments
+  }
+
   Future<void> _addCustomSession(BuildContext context) async {
     final groupeController = context.read<GroupeController>();
     final DateTime? selectedDate = await showDatePicker(
@@ -237,6 +243,49 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       ),
                     ),
                   );
+                }
+              },
+              onLongPress: (CalendarLongPressDetails details) async {
+                if (details.appointments != null &&
+                    details.appointments!.isNotEmpty) {
+                  final appointment =
+                      details.appointments!.first as Appointment;
+
+                  // Check if the long-pressed appointment is a custom session
+                  if (appointment.color == Colors.green) {
+                    final shouldDelete = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: Text('Supprimer la séance personnalisée'),
+                          content: Text(
+                              'Êtes-vous sûr de vouloir supprimer cette séance personnalisée ?'),
+                          actions: [
+                            TextButton(
+                              child: Text('Annuler'),
+                              onPressed: () => Navigator.of(context).pop(false),
+                            ),
+                            TextButton(
+                              child: Text('Supprimer'),
+                              onPressed: () => Navigator.of(context).pop(true),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+
+                    if (shouldDelete == true) {
+                      // Retrieve the CustomSeance instance
+                      final customSessions =
+                          await DatabaseService().getCustomSeances();
+                      final session = customSessions.firstWhere((s) =>
+                          s.startTime == appointment.startTime &&
+                          s.endTime == appointment.endTime);
+
+                      await _deleteCustomSession(session); // Delete the session
+                      await _loadAppointments(); // Reload appointments
+                    }
+                  }
                 }
               },
             ),
