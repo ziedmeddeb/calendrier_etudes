@@ -1,3 +1,4 @@
+import 'package:calendrier_etude/models/custom_seance.dart';
 import 'package:calendrier_etude/models/etudiant_presence.dart';
 import 'package:calendrier_etude/models/seance.dart';
 import 'package:sqflite/sqflite.dart';
@@ -60,6 +61,16 @@ class DatabaseService {
     present INTEGER NOT NULL
   )
 ''');
+
+    await db.execute('''
+      CREATE TABLE custom_seances(
+        id TEXT PRIMARY KEY,
+        groupeId TEXT,
+        startTime TEXT,
+        endTime TEXT,
+        FOREIGN KEY (groupeId) REFERENCES groupes (id)
+      )
+    ''');
   }
 
   Future<void> insertGroupe(Groupe groupe, BuildContext context) async {
@@ -290,6 +301,30 @@ class DatabaseService {
       'seances',
       where: 'etudiantId = ?',
       whereArgs: [studentId],
+    );
+  }
+
+  Future<void> insertCustomSeance(CustomSeance customSeance) async {
+    final db = await database;
+    await db.insert(
+      'custom_seances',
+      customSeance.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<CustomSeance>> getCustomSeances() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('custom_seances');
+    return List.generate(maps.length, (i) => CustomSeance.fromMap(maps[i]));
+  }
+
+  Future<void> deleteCustomSeance(String id) async {
+    final db = await database;
+    await db.delete(
+      'custom_seances',
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 }
