@@ -92,6 +92,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
       for (var seance in _seanceMap.values) {
         await _databaseService.insertSeance(seance);
+
+        // Update the Etudiant's unpaidSessions in the database
+        Etudiant? etudiant =
+            await _databaseService.getEtudiantById(seance.etudiantId);
+        if (etudiant != null) {
+          int unpaidSessions = etudiant.unpaidSessions ?? 0;
+          if (seance.present == true) {
+            unpaidSessions += 1; // Add to unpaid sessions if present
+          } else {
+            unpaidSessions -= 1; // Remove from unpaid sessions if absent
+          }
+          etudiant.unpaidSessions = unpaidSessions;
+          print('Updating Etudiant: $etudiant');
+          await _databaseService.updateEtudiant(
+              etudiant, widget.groupe.id); // Save updated Etudiant
+        }
       }
 
       if (!mounted) return;

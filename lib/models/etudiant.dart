@@ -3,12 +3,15 @@ class Etudiant {
   String nom;
   String lycee;
   bool present;
+  int unpaidSessions;
 
-  Etudiant(
-      {required this.id,
-      required this.nom,
-      required this.lycee,
-      this.present = false});
+  Etudiant({
+    required this.id,
+    required this.nom,
+    required this.lycee,
+    this.present = false,
+    this.unpaidSessions = 0,
+  });
 
   Map<String, dynamic> toMap(String groupeId) {
     return {
@@ -17,6 +20,7 @@ class Etudiant {
       'lycee': lycee,
       'present': present ? 1 : 0,
       'groupeId': groupeId,
+      'unpaidSessions': unpaidSessions,
     };
   }
 
@@ -26,11 +30,12 @@ class Etudiant {
       nom: map['nom'],
       lycee: map['lycee'],
       present: map['present'] == 1,
+      unpaidSessions: map['unpaidSessions'],
     );
   }
 
   @override
   String toString() {
-    return 'Etudiant{id: $id, nom: $nom, lycee: $lycee, present: $present}';
+    return 'Etudiant{id: $id, nom: $nom, lycee: $lycee, present: $present,unpaidSessions: $unpaidSessions}';
   }
 }

@@ -49,6 +49,7 @@ class DatabaseService {
         lycee TEXT,
         present INTEGER,
         groupeId TEXT,
+        unpaidSessions INTEGER DEFAULT 0,
         FOREIGN KEY(groupeId) REFERENCES groupes(id)
       )
     ''');
@@ -119,6 +120,7 @@ class DatabaseService {
 
   Future<void> updateEtudiant(Etudiant etudiant, String groupeId) async {
     final db = await database;
+    print('update ${etudiant.toMap(groupeId)}');
     await db.update(
       'etudiants',
       etudiant.toMap(groupeId),
@@ -326,5 +328,19 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<List<Seance>> getSeancesByEtudiantId(String etudiantId) async {
+    final db = await database;
+
+    // Query to fetch all seances for a specific etudiantId
+    final List<Map<String, dynamic>> maps = await db.query(
+      'seances',
+      where: 'etudiantId = ?',
+      whereArgs: [etudiantId],
+    );
+
+    // Convert the query results to a list of Seance objects
+    return List.generate(maps.length, (i) => Seance.fromMap(maps[i]));
   }
 }
