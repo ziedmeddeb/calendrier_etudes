@@ -1,4 +1,6 @@
 import 'package:calendrier_etude/models/groupe.dart';
+import 'package:calendrier_etude/models/paiement_hisotrique.dart';
+import 'package:calendrier_etude/paiement_historique_screen.dart';
 import 'package:flutter/material.dart';
 import 'models/etudiant.dart';
 import 'services/database_service.dart'; // Make sure you import the DatabaseService class
@@ -44,7 +46,7 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop(); // Close the dialog
-                _payForSessions(etudiant); // Proceed with payment
+                _payForSessions(etudiant); // Proceed with payments
               },
               child: Text('Confirmer'),
             ),
@@ -56,6 +58,14 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
 
   Future<void> _payForSessions(Etudiant etudiant) async {
     if (etudiant.unpaidSessions != null) {
+      // Create and save the payment record
+      final payment = Payment(
+        etudiantId: etudiant.id,
+        numberOfSessions: 4,
+        date: DateTime.now(),
+      );
+      await DatabaseService().insertPayment(payment);
+
       // Update unpaid sessions
       etudiant.unpaidSessions = etudiant.unpaidSessions! - 4;
 
@@ -100,6 +110,20 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                 ElevatedButton(
                   onPressed: () => _showConfirmationDialog(etudiant),
                   child: Text('Payer 4 Séances'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PaymentHistoryScreen(
+                          etudiant: etudiant,
+                          group: widget.group,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Text('Voir Historique Paiements'),
                 ),
                 // The FutureBuilder for displaying seances
                 Expanded(

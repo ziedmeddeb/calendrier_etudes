@@ -1,4 +1,5 @@
 import 'package:calendrier_etude/add_group_screen.dart';
+import 'package:calendrier_etude/student_list_pdf.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'controllers/groupe_controller.dart';
@@ -11,7 +12,21 @@ class GroupManagementScreen extends StatelessWidget {
     final groupeController = Provider.of<GroupeController>(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text('Gestion des Groupes')),
+      appBar: AppBar(
+        title: Text('Gestion des Groupes'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.calendar_view_day),
+            tooltip: 'Voir étudiants par jour',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => StudentsByDayScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: ListView.separated(
         itemCount: groupeController.groupes.length,
         separatorBuilder: (context, index) => Divider(),

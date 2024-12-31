@@ -90,23 +90,45 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _isLoading = true;
       });
 
+      // Get all original seances for this date
+      final originalSeances =
+          await _databaseService.getSeancesByDate(widget.date);
+      final Map<String, bool> originalAttendance = {
+        for (var seance in originalSeances) seance.etudiantId: seance.present
+      };
+
       for (var seance in _seanceMap.values) {
         await _databaseService.insertSeance(seance);
 
-        // Update the Etudiant's unpaidSessions in the database
-        Etudiant? etudiant =
-            await _databaseService.getEtudiantById(seance.etudiantId);
-        if (etudiant != null) {
-          int unpaidSessions = etudiant.unpaidSessions ?? 0;
-          if (seance.present == true) {
-            unpaidSessions += 1; // Add to unpaid sessions if present
-          } else {
-            unpaidSessions -= 1; // Remove from unpaid sessions if absent
+        // Only update unpaid sessions if this is a new attendance record or the status changed
+        final originalPresent = originalAttendance[seance.etudiantId];
+        if (originalPresent == null || originalPresent != seance.present) {
+          Etudiant? etudiant =
+              await _databaseService.getEtudiantById(seance.etudiantId);
+          if (etudiant != null) {
+            int unpaidSessions = etudiant.unpaidSessions;
+            if (seance.present) {
+              // Only increment if it's a new present record
+              if (originalPresent == null || !originalPresent) {
+                unpaidSessions += 1;
+              }
+            } else {
+              // Only decrement if changing from present to absent
+              if (originalPresent == true) {
+                unpaidSessions -= 1;
+              }
+            }
+            etudiant.unpaidSessions = unpaidSessions;
+
+            // Get the student's original group ID
+            String? originalGroupId = await _databaseService
+                .findStudentOriginalGroup(seance.etudiantId);
+            if (originalGroupId != null) {
+              // Update the student while preserving their original group
+              await _databaseService.updateEtudiantUnpaidSessions(
+                  etudiant, originalGroupId);
+            }
           }
-          etudiant.unpaidSessions = unpaidSessions;
-          print('Updating Etudiant: $etudiant');
-          await _databaseService.updateEtudiant(
-              etudiant, widget.groupe.id); // Save updated Etudiant
         }
       }
 

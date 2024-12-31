@@ -1,6 +1,8 @@
 import 'package:calendrier_etude/models/custom_seance.dart';
 import 'package:calendrier_etude/models/etudiant_presence.dart';
+import 'package:calendrier_etude/models/paiement_hisotrique.dart';
 import 'package:calendrier_etude/models/seance.dart';
+import 'package:calendrier_etude/models/student_group.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:flutter/material.dart';
@@ -70,6 +72,16 @@ class DatabaseService {
         startTime TEXT,
         endTime TEXT,
         FOREIGN KEY (groupeId) REFERENCES groupes (id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE payments(
+        id TEXT PRIMARY KEY,
+        etudiantId TEXT NOT NULL,
+        numberOfSessions INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        FOREIGN KEY(etudiantId) REFERENCES etudiants(id)
       )
     ''');
   }
@@ -154,21 +166,21 @@ class DatabaseService {
   //   );
   // }
 
-  Future<void> updateSeance(Seance seance) async {
-    print("updateSeance");
-    final db = await database;
-    await db.update(
-      'seances',
-      seance.toMap(),
-      where: 'id = ?',
-      whereArgs: [seance.id],
-    );
-    await db.delete(
-      'seance_etudiants',
-      where: 'seanceId = ?',
-      whereArgs: [seance.id],
-    );
-  }
+  // Future<void> updateSeance(Seance seance) async {
+  //   print("updateSeance");
+  //   final db = await database;
+  //   await db.update(
+  //     'seances',
+  //     seance.toMap(),
+  //     where: 'id = ?',
+  //     whereArgs: [seance.id],
+  //   );
+  //   await db.delete(
+  //     'seance_etudiants',
+  //     where: 'seanceId = ?',
+  //     whereArgs: [seance.id],
+  //   );
+  // }
 
   Future<List<Seance>> getSeancesByDate(DateTime date) async {
     final db = await database;
@@ -342,5 +354,178 @@ class DatabaseService {
 
     // Convert the query results to a list of Seance objects
     return List.generate(maps.length, (i) => Seance.fromMap(maps[i]));
+  }
+
+  // Future<String?> findStudentOriginalGroup(String studentId) async {
+  //   final db = await database;
+  //   final List<Map<String, dynamic>> result = await db.query(
+  //     'etudiants',
+  //     columns: ['groupeId'],
+  //     where: 'id = ?',
+  //     whereArgs: [studentId],
+  //   );
+
+  //   if (result.isNotEmpty) {
+  //     return result.first['groupeId'] as String;
+  //   }
+  //   return null;
+  // }
+
+  // Future<void> updateEtudiantUnpaidSessions(Etudiant etudiant) async {
+  //   final db = await database;
+  //   await db.update(
+  //     'etudiants',
+  //     {'unpaidSessions': etudiant.unpaidSessions},
+  //     where: 'id = ?',
+  //     whereArgs: [etudiant.id],
+  //   );
+  // }
+
+  Future<Seance?> getSeanceForStudentOnDate(
+      String studentId, DateTime date) async {
+    final db = await database;
+    final List<Map<String, dynamic>> result = await db.query(
+      'seances',
+      where: 'etudiantId = ? AND date = ?',
+      whereArgs: [studentId, date.toIso8601String()],
+    );
+
+    if (result.isNotEmpty) {
+      return Seance.fromMap(result.first);
+    }
+    return null;
+  }
+
+  Future<void> updateSeance(Seance seance) async {
+    final db = await database;
+    await db.update(
+      'seances',
+      seance.toMap(),
+      where: 'id = ?',
+      whereArgs: [seance.id],
+    );
+  }
+
+  Future<String?> findStudentOriginalGroup(String studentId) async {
+    final db = await database;
+    try {
+      final List<Map<String, dynamic>> result = await db.query(
+        'etudiants',
+        where: 'id = ?',
+        whereArgs: [studentId],
+      );
+
+      if (result.isNotEmpty) {
+        final student = Etudiant.fromMap(result.first);
+        return result.first['groupeId'] as String;
+      }
+      return null;
+    } catch (e) {
+      print('Error finding student original group: $e');
+      return null;
+    }
+  }
+
+  Future<void> updateEtudiantUnpaidSessions(
+      Etudiant etudiant, String groupId) async {
+    final db = await database;
+    await db.update(
+      'etudiants',
+      {
+        'unpaidSessions': etudiant.unpaidSessions,
+        'groupeId': groupId // Ensure we keep the original group ID
+      },
+      where: 'id = ?',
+      whereArgs: [etudiant.id],
+    );
+  }
+
+  Future<Map<String, List<StudentGroupInfo>>> getStudentsByDay() async {
+    final db = await database;
+    final Map<String, List<StudentGroupInfo>> studentsByDay = {};
+
+    // Get all groups
+    final List<Map<String, dynamic>> groups = await db.query('groupes');
+
+    for (var group in groups) {
+      final String day = group['jour'] as String;
+      if (!studentsByDay.containsKey(day)) {
+        studentsByDay[day] = [];
+      }
+
+      // Get students for this group
+      final students = await getEtudiants(group['id'] as String);
+      for (var student in students) {
+        studentsByDay[day]!.add(
+          StudentGroupInfo(
+            student: student,
+            groupName: group['nom'] as String,
+            lycee: student.lycee,
+            unpaidSessions: student.unpaidSessions,
+          ),
+        );
+      }
+    }
+
+    // Sort students within each day
+    studentsByDay.forEach((day, students) {
+      students.sort((a, b) =>
+          a.student.nom.toLowerCase().compareTo(b.student.nom.toLowerCase()));
+    });
+
+    return studentsByDay;
+  }
+
+  Future<void> insertPayment(Payment payment) async {
+    final db = await database;
+    await db.insert(
+      'payments',
+      payment.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Payment>> getPaymentsByEtudiantId(String etudiantId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'payments',
+      where: 'etudiantId = ?',
+      whereArgs: [etudiantId],
+      orderBy: 'date DESC',
+    );
+    return List.generate(maps.length, (i) => Payment.fromMap(maps[i]));
+  }
+
+  Future<void> deletePayment(String paymentId) async {
+    final db = await database;
+    await db.delete(
+      'payments',
+      where: 'id = ?',
+      whereArgs: [paymentId],
+    );
+  }
+
+  Future<void> addUnpaidSessions(
+      String etudiantId, String groupId, int numberOfSessions) async {
+    final db = await database;
+
+    // Récupérer l'étudiant actuel
+    final List<Map<String, dynamic>> result = await db.query(
+      'etudiants',
+      where: 'id = ?',
+      whereArgs: [etudiantId],
+    );
+
+    if (result.isNotEmpty) {
+      final currentUnpaidSessions = result.first['unpaidSessions'] as int? ?? 0;
+      final newUnpaidSessions = currentUnpaidSessions + numberOfSessions;
+
+      await db.update(
+        'etudiants',
+        {'unpaidSessions': newUnpaidSessions},
+        where: 'id = ?',
+        whereArgs: [etudiantId],
+      );
+    }
   }
 }

@@ -141,12 +141,14 @@ class GroupDetailScreen extends StatelessWidget {
   // Fetch updated list of Etudiants from the database
   Future<List<Etudiant>> _fetchEtudiants(String groupId) async {
     final etudiants = await DatabaseService().getEtudiants(groupId);
-    // Optionally, you can update each Etudiant data here if necessary
     for (var etudiant in etudiants) {
       final updatedEtudiant =
           await DatabaseService().getEtudiantById(etudiant.id);
       etudiant = updatedEtudiant!;
     }
+    // Sort alphabetically by name
+    etudiants
+        .sort((a, b) => a.nom.toLowerCase().compareTo(b.nom.toLowerCase()));
     return etudiants;
   }
 }
