@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:math';
+import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:calendrier_etude/models/student_group.dart';
 import 'package:calendrier_etude/services/database_service.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class StudentsByDayScreen extends StatelessWidget {
   final List<String> daysOfWeek = [
@@ -16,6 +19,9 @@ class StudentsByDayScreen extends StatelessWidget {
     'Samedi',
     'Dimanche'
   ];
+  String _formatDate(DateTime date) {
+    return DateFormat('dd/MM/yyyy', 'fr_FR').format(date);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,39 +48,47 @@ class StudentsByDayScreen extends StatelessWidget {
             return Center(child: Text('Aucun étudiant trouvé'));
           }
 
-          return Padding(
-            padding: EdgeInsets.all(8.0),
+          final double cellWidth = MediaQuery.of(context).size.width * 0.25;
+
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width,
-                      ),
-                      child: DataTable(
-                        columnSpacing: 20,
-                        headingRowHeight: 60,
-                        dataRowMinHeight: 80,
-                        dataRowMaxHeight: 120,
-                        columns: [
-                          ...daysOfWeek.map((day) => DataColumn(
-                                label: Container(
-                                  width: MediaQuery.of(context).size.width / 8,
-                                  child: Text(
-                                    day,
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              )),
-                        ],
-                        rows: _buildTableRows(snapshot.data!),
-                      ),
-                    ),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.black,
+                ),
+                child: DataTable(
+                  border: TableBorder.all(
+                    color: Colors.black,
+                    width: 1,
+                    style: BorderStyle.solid,
                   ),
-                ],
+                  columnSpacing: 0,
+                  headingRowHeight: 60,
+                  dataRowMinHeight: 80,
+                  dataRowMaxHeight: 120,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black),
+                  ),
+                  columns: daysOfWeek
+                      .map((day) => DataColumn(
+                            label: Container(
+                              width: cellWidth,
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  right: BorderSide(color: Colors.black),
+                                ),
+                              ),
+                              child: Text(
+                                day,
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                  rows: _buildTableRows(snapshot.data!, cellWidth),
+                ),
               ),
             ),
           );
@@ -84,7 +98,7 @@ class StudentsByDayScreen extends StatelessWidget {
   }
 
   List<DataRow> _buildTableRows(
-      Map<String, List<StudentGroupInfo>> studentsByDay) {
+      Map<String, List<StudentGroupInfo>> studentsByDay, double cellWidth) {
     int maxStudents = studentsByDay.values
         .map((students) => students.length)
         .fold(0, (max, length) => length > max ? length : max);
@@ -97,20 +111,23 @@ class StudentsByDayScreen extends StatelessWidget {
             final info = students[i];
             return DataCell(
               Container(
-                width: double.infinity,
+                width: cellWidth,
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  border: Border(
+                    right: BorderSide(color: Colors.black),
+                  ),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       info.student.nom,
                       style: TextStyle(fontWeight: FontWeight.bold),
-                      overflow: TextOverflow.ellipsis,
                     ),
                     SizedBox(height: 4),
-                    Text(
-                      '${info.groupName} - ${info.lycee}',
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text('${info.groupName} - ${info.lycee}'),
                     SizedBox(height: 4),
                     Text(
                       'Non payées: ${info.unpaidSessions}',
@@ -124,7 +141,14 @@ class StudentsByDayScreen extends StatelessWidget {
               ),
             );
           }
-          return DataCell(Container());
+          return DataCell(Container(
+            width: cellWidth,
+            decoration: BoxDecoration(
+              border: Border(
+                right: BorderSide(color: Colors.black),
+              ),
+            ),
+          ));
         }).toList(),
       );
     });
@@ -142,7 +166,8 @@ class StudentsByDayScreen extends StatelessWidget {
             return [
               pw.Header(
                 level: 0,
-                child: pw.Text('Liste des Étudiants par Jour ${DateTime.now()}',
+                child: pw.Text(
+                    'Liste des Étudiants par Jour ${_formatDate(DateTime.now())}',
                     style: pw.TextStyle(fontSize: 20)),
               ),
               pw.SizedBox(height: 20),
@@ -180,7 +205,10 @@ class StudentsByDayScreen extends StatelessWidget {
       }
 
       if (directory != null) {
-        final String path = '${directory.path}/etudiants_par_jour.pdf';
+        final int randomNumber = Random()
+            .nextInt(100000); // Generates a random number between 0 and 99999
+        final String path =
+            '${directory.path}/etudiants_par_jour_$randomNumber.pdf';
         final file = File(path);
         await file.writeAsBytes(await pdf.save());
 

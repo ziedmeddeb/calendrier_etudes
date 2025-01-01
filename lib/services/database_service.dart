@@ -344,16 +344,15 @@ class DatabaseService {
 
   Future<List<Seance>> getSeancesByEtudiantId(String etudiantId) async {
     final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('seances',
+        where: 'etudiantId = ?',
+        whereArgs: [etudiantId],
+        orderBy: 'date ASC' // Changed to ASC for oldest to newest
+        );
 
-    // Query to fetch all seances for a specific etudiantId
-    final List<Map<String, dynamic>> maps = await db.query(
-      'seances',
-      where: 'etudiantId = ?',
-      whereArgs: [etudiantId],
-    );
-
-    // Convert the query results to a list of Seance objects
-    return List.generate(maps.length, (i) => Seance.fromMap(maps[i]));
+    return List.generate(maps.length, (i) {
+      return Seance.fromMap(maps[i]);
+    });
   }
 
   // Future<String?> findStudentOriginalGroup(String studentId) async {

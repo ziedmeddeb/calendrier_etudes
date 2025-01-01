@@ -24,6 +24,10 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
   void initState() {
     super.initState();
     // Fetch the Etudiant data from the database using the group ID
+    _refreshPayments();
+  }
+
+  void _refreshPayments() {
     etudiantFuture = DatabaseService()
         .getEtudiantById(widget.etudiant.id)
         .then((etudiant) => etudiant!);
@@ -96,7 +100,15 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Historique de l\'étudiant')),
+      appBar: AppBar(
+        title: Text('Historique de l\'étudiant'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: () => setState(() => _refreshPayments()),
+          ),
+        ],
+      ),
       body: FutureBuilder<Etudiant>(
         future: etudiantFuture,
         builder: (context, snapshot) {
@@ -143,8 +155,6 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                         return Center(child: Text('Pas de séances.'));
                       } else {
                         final seances = snapshot.data!;
-                        seances.sort((a, b) => b.date
-                            .compareTo(a.date)); // Sort by date descending
 
                         return ListView.builder(
                           itemCount: seances.length,

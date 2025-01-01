@@ -274,7 +274,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 final isPresent = seance?.present ?? false;
 
                 return ListTile(
-                  title: Text('Étudiant: ${etudiant.nom}'),
+                  title: Text('${etudiant.nom}'),
                   trailing: IconButton(
                     icon: Icon(
                       isPresent
