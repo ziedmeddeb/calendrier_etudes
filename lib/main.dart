@@ -1,6 +1,5 @@
 import 'package:calendrier_etude/services/database_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart';
 import 'controllers/groupe_controller.dart';
 
@@ -11,18 +10,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize notifications
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const initializationSettings =
-      InitializationSettings(android: androidSettings);
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-  // Delete and recreate the database
-  await DatabaseService().deleteDatabaseAndRecreate();
-
-  print('Database has been recreated.');
   runApp(MyApp());
 }
 

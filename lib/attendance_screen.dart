@@ -227,21 +227,41 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       return Center(child: Text('Aucune donnée disponible'));
     }
 
+    final int totalStudents =
+        widget.groupe.etudiants.length + _externalStudents.length;
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
             children: [
-              Text(
-                'Date: ${widget.date.day}/${widget.date.month}/${widget.date.year}',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Date: ${widget.date.day}/${widget.date.month}/${widget.date.year}',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    'Total étudiants: $totalStudents',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
-              ElevatedButton.icon(
-                icon: Icon(Icons.person_add),
-                label: Text('Ajouter étudiant'),
-                onPressed: _addExternalStudent,
+              SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (_externalStudents.isNotEmpty)
+                    Text(
+                        '(${widget.groupe.etudiants.length} réguliers, ${_externalStudents.length} externes)'),
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.person_add),
+                    label: Text('Ajouter étudiant'),
+                    onPressed: _addExternalStudent,
+                  ),
+                ],
               ),
             ],
           ),
@@ -249,7 +269,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         Expanded(
           child: ListView(
             children: [
-              // Regular group students
               ...widget.groupe.etudiants.map((etudiant) {
                 final seance = _seanceMap[etudiant.id];
                 final isPresent = seance?.present ?? false;
@@ -266,8 +285,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   ),
                 );
               }),
-
-              // Divider if there are external students
               if (_externalStudents.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -285,8 +302,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ],
                   ),
                 ),
-
-              // External students
               ..._externalStudents.values.map((etudiant) {
                 final seance = _seanceMap[etudiant.id];
                 final isPresent = seance?.present ?? false;

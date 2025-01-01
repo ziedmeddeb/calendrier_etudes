@@ -294,6 +294,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   List<DateTime> _getAllOccurrences(String jour) {
     final now = DateTime.now();
+    final startDate =
+        now.subtract(Duration(days: 365)); // Start from 1 year ago
+
     final daysOfWeek = {
       'Lundi': DateTime.monday,
       'Mardi': DateTime.tuesday,
@@ -303,15 +306,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
       'Samedi': DateTime.saturday,
       'Dimanche': DateTime.sunday,
     };
+
     int weekday = daysOfWeek[jour]!;
     List<DateTime> occurrences = [];
-    DateTime occurrence = now;
+    DateTime occurrence = startDate;
 
+    // Find first occurrence of the weekday
     while (occurrence.weekday != weekday) {
       occurrence = occurrence.add(Duration(days: 1));
     }
 
-    for (int i = 0; i < 52; i++) {
+    // Add occurrences for past year and upcoming year
+    final endDate = now.add(Duration(days: 365));
+    while (occurrence.isBefore(endDate)) {
       occurrences.add(occurrence);
       occurrence = occurrence.add(Duration(days: 7));
     }

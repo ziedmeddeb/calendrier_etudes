@@ -2,6 +2,7 @@ import 'package:calendrier_etude/models/groupe.dart';
 import 'package:calendrier_etude/models/paiement_hisotrique.dart';
 import 'package:calendrier_etude/paiement_historique_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'models/etudiant.dart';
 import 'services/database_service.dart'; // Make sure you import the DatabaseService class
 import 'models/seance.dart'; // Import your Seance model
@@ -88,6 +89,10 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
     }
   }
 
+  String _formatDate(DateTime date) {
+    return DateFormat('dd/MM/yyyy').format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -125,7 +130,6 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                   },
                   child: Text('Voir Historique Paiements'),
                 ),
-                // The FutureBuilder for displaying seances
                 Expanded(
                   child: FutureBuilder<List<Seance>>(
                     future:
@@ -139,12 +143,15 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                         return Center(child: Text('Pas de séances.'));
                       } else {
                         final seances = snapshot.data!;
+                        seances.sort((a, b) => b.date
+                            .compareTo(a.date)); // Sort by date descending
+
                         return ListView.builder(
                           itemCount: seances.length,
                           itemBuilder: (context, index) {
                             final seance = seances[index];
                             return ListTile(
-                              title: Text('Date: ${seance.date}'),
+                              title: Text('Date: ${_formatDate(seance.date)}'),
                               subtitle: Text(
                                   'Present: ${seance.present ? "Oui" : "Non"}'),
                             );

@@ -32,6 +32,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         id: widget.etudiant.id,
         nom: _studentNameController.text,
         lycee: _studentLyceeController.text,
+        unpaidSessions: widget.etudiant.unpaidSessions,
       );
       Provider.of<GroupeController>(context, listen: false)
           .modifierEtudiantDuGroupe(widget.groupeId, updatedEtudiant);

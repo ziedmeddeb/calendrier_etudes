@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
@@ -8,21 +7,6 @@ import 'package:calendrier_etude/services/database_service.dart';
 import 'package:flutter/material.dart';
 
 class StudentsByDayScreen extends StatelessWidget {
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  StudentsByDayScreen() {
-    _initializeNotifications();
-  }
-
-  Future<void> _initializeNotifications() async {
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initializationSettings =
-        InitializationSettings(android: androidSettings);
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-  }
-
   final List<String> daysOfWeek = [
     'Lundi',
     'Mardi',
@@ -146,30 +130,6 @@ class StudentsByDayScreen extends StatelessWidget {
     });
   }
 
-  Future<void> _showDownloadNotification(String filePath) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-      'downloads_channel',
-      'Downloads',
-      channelDescription: 'Notifications for downloaded files',
-      importance: Importance.high,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
-    );
-
-    const NotificationDetails platformDetails =
-        NotificationDetails(android: androidDetails);
-
-    await flutterLocalNotificationsPlugin.show(
-      0,
-      'Téléchargement terminé',
-      'Le fichier PDF a été enregistré',
-      platformDetails,
-      payload: filePath,
-    );
-  }
-
   Future<void> _generatePDF(BuildContext context) async {
     try {
       final pdf = pw.Document();
@@ -182,7 +142,7 @@ class StudentsByDayScreen extends StatelessWidget {
             return [
               pw.Header(
                 level: 0,
-                child: pw.Text('Liste des Étudiants par Jour',
+                child: pw.Text('Liste des Étudiants par Jour ${DateTime.now()}',
                     style: pw.TextStyle(fontSize: 20)),
               ),
               pw.SizedBox(height: 20),
@@ -223,9 +183,6 @@ class StudentsByDayScreen extends StatelessWidget {
         final String path = '${directory.path}/etudiants_par_jour.pdf';
         final file = File(path);
         await file.writeAsBytes(await pdf.save());
-
-        // Show notification
-        await _showDownloadNotification(path);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
