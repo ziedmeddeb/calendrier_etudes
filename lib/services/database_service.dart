@@ -724,4 +724,36 @@ class DatabaseService {
       return Seance.fromMap(maps[i]);
     });
   }
+
+  Future<void> createHiddenSeancesTable() async {
+    final db = await database;
+    await db.execute('''
+    CREATE TABLE IF NOT EXISTS hidden_seances(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT,
+      groupe_id TEXT,
+      UNIQUE(date, groupe_id)
+    )
+  ''');
+  }
+
+  Future<void> hideSeance(DateTime date, String groupeId) async {
+    final db = await database;
+    final normalizedDate =
+        DateTime(date.year, date.month, date.day, date.hour).toIso8601String();
+
+    await db.insert(
+      'hidden_seances',
+      {
+        'date': normalizedDate,
+        'groupe_id': groupeId,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getHiddenSeances() async {
+    final db = await database;
+    return await db.query('hidden_seances');
+  }
 }

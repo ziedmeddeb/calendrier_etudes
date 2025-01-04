@@ -74,7 +74,8 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                       child: Text(student.nom[0]),
                     ),
                     title: Text(' ${student.nom}'),
-                    subtitle: Text('Groupe: ${groupe.nom} - ${groupe.jour}'),
+                    subtitle: Text(
+                        'Groupe: ${groupe.nom} - ${groupe.jour} - ${student.lycee}'),
                     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                       IconButton(
                         icon: Icon(Icons.history),

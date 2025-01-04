@@ -40,6 +40,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       });
 
       // Run all initialization steps in sequence
+      await DatabaseService().createHiddenSeancesTable();
       await DatabaseService().addNameColumnToTables();
       await DatabaseService().cleanupSeanceDates();
       await _loadAppointments();
@@ -265,6 +266,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
           '${seance.date.year}-${seance.date.month}-${seance.date.day}-${seance.date.hour}';
       seancesByDateTime[key] = seance.name;
     }
+    // Get hidden séances
+    final hiddenSeances = await databaseService.getHiddenSeances();
+    final hiddenSeanceKeys = hiddenSeances.map((hs) {
+      final date = DateTime.parse(hs['date'] as String);
+      return '${date.year}-${date.month}-${date.day}-${date.hour}-${hs['groupe_id']}';
+    }).toSet();
 
     // Regular weekly sessions
     for (var groupe in groupes) {
@@ -290,29 +297,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
         final key =
             '${startTime.year}-${startTime.month}-${startTime.day}-${startTime.hour}';
         final sessionName = seancesByDateTime[key];
+        if (!hiddenSeanceKeys.contains('$key-${groupe.id}')) {
+          appointments.add(Appointment(
+            startTime: startTime,
+            endTime: endTime,
+            subject: sessionName != null
+                ? '${groupe.nom} - $sessionName'
+                : groupe.nom,
+            color: sessionName != null ? Colors.blue : Colors.red,
+            notes: groupe.id,
+          ));
+        }
+      }
 
+      // Add custom sessions
+      final customSessions = await databaseService.getCustomSeances();
+      for (var session in customSessions) {
+        final groupe = groupes.firstWhere((g) => g.id == session.groupeId);
         appointments.add(Appointment(
-          startTime: startTime,
-          endTime: endTime,
-          subject:
-              sessionName != null ? '${groupe.nom} - $sessionName' : groupe.nom,
-          color: sessionName != null ? Colors.blue : Colors.red,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          subject: '${groupe.nom} - ${session.name}',
+          color: Colors.green,
           notes: groupe.id,
         ));
       }
-    }
-
-    // Add custom sessions
-    final customSessions = await databaseService.getCustomSeances();
-    for (var session in customSessions) {
-      final groupe = groupes.firstWhere((g) => g.id == session.groupeId);
-      appointments.add(Appointment(
-        startTime: session.startTime,
-        endTime: session.endTime,
-        subject: '${groupe.nom} - ${session.name}',
-        color: Colors.green,
-        notes: groupe.id,
-      ));
     }
 
     return appointments;
@@ -425,39 +434,77 @@ class _CalendarScreenState extends State<CalendarScreen> {
               if (details.appointments != null &&
                   details.appointments!.isNotEmpty) {
                 final appointment = details.appointments!.first as Appointment;
-                if (appointment.color == Colors.green) {
-                  final shouldDelete = await showDialog<bool>(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: Text('Supprimer la séance personnalisée'),
-                        content: Text(
-                            'Êtes-vous sûr de vouloir supprimer cette séance personnalisée ?'),
-                        actions: [
-                          TextButton(
-                            child: Text('Annuler'),
-                            onPressed: () => Navigator.of(context).pop(false),
-                          ),
-                          TextButton(
-                            child: Text('Supprimer'),
-                            onPressed: () => Navigator.of(context).pop(true),
-                          ),
+
+                // Show options menu
+                await showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: Text('Options de la séance'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (appointment.color == Colors.green)
+                            ListTile(
+                              leading: Icon(Icons.delete),
+                              title: Text('Supprimer la séance personnalisée'),
+                              onTap: () async {
+                                Navigator.of(context).pop('delete');
+                              },
+                            ),
+                          if (appointment.color != Colors.green)
+                            ListTile(
+                              leading: Icon(Icons.visibility_off),
+                              title: Text('Masquer cette séance'),
+                              onTap: () async {
+                                Navigator.of(context).pop('hide');
+                              },
+                            ),
                         ],
-                      );
-                    },
-                  );
+                      ),
+                    );
+                  },
+                ).then((result) async {
+                  if (result == 'delete') {
+                    final shouldDelete = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: Text('Supprimer la séance personnalisée'),
+                          content: Text(
+                              'Êtes-vous sûr de vouloir supprimer cette séance personnalisée ?'),
+                          actions: [
+                            TextButton(
+                              child: Text('Annuler'),
+                              onPressed: () => Navigator.of(context).pop(false),
+                            ),
+                            TextButton(
+                              child: Text('Supprimer'),
+                              onPressed: () => Navigator.of(context).pop(true),
+                            ),
+                          ],
+                        );
+                      },
+                    );
 
-                  if (shouldDelete == true) {
-                    final customSessions =
-                        await DatabaseService().getCustomSeances();
-                    final session = customSessions.firstWhere((s) =>
-                        s.startTime == appointment.startTime &&
-                        s.endTime == appointment.endTime);
+                    if (shouldDelete == true) {
+                      final customSessions =
+                          await DatabaseService().getCustomSeances();
 
-                    await _deleteCustomSession(session);
-                    await _loadAppointments();
+                      final session = customSessions.firstWhere((s) =>
+                          s.startTime == appointment.startTime &&
+                          s.endTime == appointment.endTime);
+                      await _deleteCustomSession(session);
+                    }
+                  } else if (result == 'hide') {
+                    // Hide the séance
+                    final groupe = groupeController.groupes
+                        .firstWhere((g) => g.id == appointment.notes);
+                    await DatabaseService()
+                        .hideSeance(appointment.startTime, groupe.id);
                   }
-                }
+                  await _loadAppointments();
+                });
               }
             },
           );
