@@ -85,7 +85,7 @@ class StudentsByDayScreen extends StatelessWidget {
                   columnSpacing: 0,
                   headingRowHeight: 60,
                   dataRowMinHeight: 80,
-                  dataRowMaxHeight: 120,
+                  dataRowMaxHeight: 160,
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.black),
                   ),
@@ -185,7 +185,7 @@ class StudentsByDayScreen extends StatelessWidget {
                       Text(
                         'Non payées: ${studentInfo.unpaidSessions}',
                         style: TextStyle(
-                          color: studentInfo.unpaidSessions > 0
+                          color: studentInfo.unpaidSessions >= 4
                               ? Colors.red
                               : Colors.green,
                         ),
@@ -334,7 +334,11 @@ class StudentsByDayScreen extends StatelessWidget {
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                     ),
                     pw.Text(studentInfo.lycee),
-                    pw.Text('Non payées: ${studentInfo.unpaidSessions}'),
+                    pw.Text('Non payées: ${studentInfo.unpaidSessions}',
+                        style: pw.TextStyle(
+                            color: studentInfo.unpaidSessions >= 4
+                                ? PdfColors.red
+                                : PdfColors.green))
                   ],
                 ),
               );
