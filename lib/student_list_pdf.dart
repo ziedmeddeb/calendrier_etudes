@@ -19,8 +19,27 @@ class StudentsByDayScreen extends StatelessWidget {
     'Samedi',
     'Dimanche'
   ];
+
   String _formatDate(DateTime date) {
     return DateFormat('dd/MM/yyyy', 'fr_FR').format(date);
+  }
+
+  // Helper method to organize students by group
+  Map<String, List<StudentGroupInfo>> _organizeByGroup(
+      List<StudentGroupInfo> students) {
+    Map<String, List<StudentGroupInfo>> groupedStudents = {};
+
+    // Sort students by group name first
+    students.sort((a, b) => a.groupName.compareTo(b.groupName));
+
+    for (var student in students) {
+      if (!groupedStudents.containsKey(student.groupName)) {
+        groupedStudents[student.groupName] = [];
+      }
+      groupedStudents[student.groupName]!.add(student);
+    }
+
+    return groupedStudents;
   }
 
   @override
@@ -87,7 +106,7 @@ class StudentsByDayScreen extends StatelessWidget {
                             ),
                           ))
                       .toList(),
-                  rows: _buildTableRows(snapshot.data!, cellWidth),
+                  rows: _buildGroupedTableRows(snapshot.data!, cellWidth),
                 ),
               ),
             ),
@@ -97,61 +116,95 @@ class StudentsByDayScreen extends StatelessWidget {
     );
   }
 
-  List<DataRow> _buildTableRows(
+  List<DataRow> _buildGroupedTableRows(
       Map<String, List<StudentGroupInfo>> studentsByDay, double cellWidth) {
-    int maxStudents = studentsByDay.values
-        .map((students) => students.length)
-        .fold(0, (max, length) => length > max ? length : max);
+    List<DataRow> allRows = [];
 
-    return List.generate(maxStudents, (i) {
-      return DataRow(
+    // Find the maximum number of groups and students per group across all days
+    int maxRows = 0;
+    for (var dayStudents in studentsByDay.values) {
+      var groupedStudents = _organizeByGroup(dayStudents);
+      int dayRows = 0;
+      for (var groupStudents in groupedStudents.values) {
+        dayRows += groupStudents.length + 1; // +1 for group header
+      }
+      maxRows = maxRows < dayRows ? dayRows : maxRows;
+    }
+
+    // Build rows
+    for (int rowIndex = 0; rowIndex < maxRows; rowIndex++) {
+      allRows.add(DataRow(
         cells: daysOfWeek.map((day) {
           final students = studentsByDay[day] ?? [];
-          if (i < students.length) {
-            final info = students[i];
-            return DataCell(
-              Container(
-                width: cellWidth,
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  border: Border(
-                    right: BorderSide(color: Colors.black),
+          final groupedStudents = _organizeByGroup(students);
+
+          // Track current position in the day's data
+          int currentPosition = 0;
+
+          for (var entry in groupedStudents.entries) {
+            String groupName = entry.key;
+            List<StudentGroupInfo> groupStudents = entry.value;
+
+            // Group header position
+            if (currentPosition == rowIndex) {
+              return DataCell(
+                Container(
+                  width: cellWidth,
+                  padding: EdgeInsets.all(8),
+                  color: Colors.grey[200],
+                  child: Text(
+                    groupName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      backgroundColor: Colors.grey[200],
+                    ),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      info.student.nom,
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 4),
-                    Text('${info.groupName} - ${info.lycee}'),
-                    SizedBox(height: 4),
-                    Text(
-                      'Non payées: ${info.unpaidSessions}',
-                      style: TextStyle(
-                        color:
-                            info.unpaidSessions > 0 ? Colors.red : Colors.green,
+              );
+            }
+
+            // Student positions
+            if (rowIndex > currentPosition &&
+                rowIndex <= currentPosition + groupStudents.length) {
+              final studentInfo = groupStudents[rowIndex - currentPosition - 1];
+              return DataCell(
+                Container(
+                  width: cellWidth,
+                  padding: EdgeInsets.all(8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        studentInfo.student.nom,
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
-                    ),
-                  ],
+                      SizedBox(height: 4),
+                      Text('${studentInfo.lycee}'),
+                      SizedBox(height: 4),
+                      Text(
+                        'Non payées: ${studentInfo.unpaidSessions}',
+                        style: TextStyle(
+                          color: studentInfo.unpaidSessions > 0
+                              ? Colors.red
+                              : Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
+              );
+            }
+
+            currentPosition += groupStudents.length + 1;
           }
-          return DataCell(Container(
-            width: cellWidth,
-            decoration: BoxDecoration(
-              border: Border(
-                right: BorderSide(color: Colors.black),
-              ),
-            ),
-          ));
+
+          return DataCell(Container(width: cellWidth));
         }).toList(),
-      );
-    });
+      ));
+    }
+
+    return allRows;
   }
 
   Future<void> _generatePDF(BuildContext context) async {
@@ -184,7 +237,7 @@ class StudentsByDayScreen extends StatelessWidget {
                             ))
                         .toList(),
                   ),
-                  ..._buildPDFTableRows(studentsByDay),
+                  ..._buildGroupedPDFTableRows(studentsByDay),
                 ],
               ),
             ];
@@ -192,11 +245,9 @@ class StudentsByDayScreen extends StatelessWidget {
         ),
       );
 
-      // Get the downloads directory for Android
       Directory? directory;
       if (Platform.isAndroid) {
         directory = Directory('/storage/emulated/0/Download');
-        // Create directory if it doesn't exist
         if (!await directory.exists()) {
           directory = await getExternalStorageDirectory();
         }
@@ -205,8 +256,7 @@ class StudentsByDayScreen extends StatelessWidget {
       }
 
       if (directory != null) {
-        final int randomNumber = Random()
-            .nextInt(100000); // Generates a random number between 0 and 99999
+        final int randomNumber = Random().nextInt(100000);
         final String path =
             '${directory.path}/etudiants_par_jour_$randomNumber.pdf';
         final file = File(path);
@@ -232,35 +282,72 @@ class StudentsByDayScreen extends StatelessWidget {
     }
   }
 
-  List<pw.TableRow> _buildPDFTableRows(
+  List<pw.TableRow> _buildGroupedPDFTableRows(
       Map<String, List<StudentGroupInfo>> studentsByDay) {
-    int maxStudents = studentsByDay.values
-        .map((students) => students.length)
-        .fold(0, (max, length) => length > max ? length : max);
+    List<pw.TableRow> allRows = [];
 
-    return List.generate(maxStudents, (i) {
-      return pw.TableRow(
+    // Calculate maximum rows needed
+    int maxRows = 0;
+    for (var dayStudents in studentsByDay.values) {
+      var groupedStudents = _organizeByGroup(dayStudents);
+      int dayRows = 0;
+      for (var groupStudents in groupedStudents.values) {
+        dayRows += groupStudents.length + 1;
+      }
+      maxRows = maxRows < dayRows ? dayRows : maxRows;
+    }
+
+    // Build rows
+    for (int rowIndex = 0; rowIndex < maxRows; rowIndex++) {
+      allRows.add(pw.TableRow(
         children: daysOfWeek.map((day) {
           final students = studentsByDay[day] ?? [];
-          if (i < students.length) {
-            final info = students[i];
-            return pw.Container(
-              padding: pw.EdgeInsets.all(8),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(info.student.nom,
-                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('${info.groupName} - ${info.lycee}'),
-                  pw.Text('Non payées: ${info.unpaidSessions}'),
-                ],
-              ),
-            );
+          final groupedStudents = _organizeByGroup(students);
+
+          int currentPosition = 0;
+
+          for (var entry in groupedStudents.entries) {
+            String groupName = entry.key;
+            List<StudentGroupInfo> groupStudents = entry.value;
+
+            if (currentPosition == rowIndex) {
+              return pw.Container(
+                padding: pw.EdgeInsets.all(8),
+                color: PdfColors.grey200,
+                child: pw.Text(
+                  groupName,
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+              );
+            }
+
+            if (rowIndex > currentPosition &&
+                rowIndex <= currentPosition + groupStudents.length) {
+              final studentInfo = groupStudents[rowIndex - currentPosition - 1];
+              return pw.Container(
+                padding: pw.EdgeInsets.all(8),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      studentInfo.student.nom,
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.Text(studentInfo.lycee),
+                    pw.Text('Non payées: ${studentInfo.unpaidSessions}'),
+                  ],
+                ),
+              );
+            }
+
+            currentPosition += groupStudents.length + 1;
           }
-          return pw.Container(
-              padding: pw.EdgeInsets.all(8), child: pw.Text(''));
+
+          return pw.Container(padding: pw.EdgeInsets.all(8));
         }).toList(),
-      );
-    });
+      ));
+    }
+
+    return allRows;
   }
 }

@@ -477,11 +477,63 @@ class DatabaseService {
 
   Future<void> insertPayment(Payment payment) async {
     final db = await database;
+
+    // Réduire le nombre de séances non payées de l'étudiant
+    final student = await getEtudiantById(payment.etudiantId);
+    if (student != null) {
+      final newUnpaidSessions =
+          student.unpaidSessions - payment.numberOfSessions;
+
+      // Update student's unpaid sessions
+      await db.update(
+        'etudiants',
+        {'unpaidSessions': newUnpaidSessions},
+        where: 'id = ?',
+        whereArgs: [payment.etudiantId],
+      );
+    }
+
+    // Insert the payment record
     await db.insert(
       'payments',
       payment.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  Future<void> deletePayment(String paymentId) async {
+    final db = await database;
+
+    // Get payment details before deleting
+    final List<Map<String, dynamic>> paymentMaps = await db.query(
+      'payments',
+      where: 'id = ?',
+      whereArgs: [paymentId],
+    );
+
+    if (paymentMaps.isNotEmpty) {
+      final payment = Payment.fromMap(paymentMaps.first);
+
+      // Add back the unpaid sessions to the student
+      final student = await getEtudiantById(payment.etudiantId);
+      if (student != null) {
+        final newUnpaidSessions =
+            student.unpaidSessions + payment.numberOfSessions;
+        await db.update(
+          'etudiants',
+          {'unpaidSessions': newUnpaidSessions},
+          where: 'id = ?',
+          whereArgs: [payment.etudiantId],
+        );
+      }
+
+      // Delete the payment record
+      await db.delete(
+        'payments',
+        where: 'id = ?',
+        whereArgs: [paymentId],
+      );
+    }
   }
 
   Future<List<Payment>> getPaymentsByEtudiantId(String etudiantId) async {
@@ -495,14 +547,14 @@ class DatabaseService {
     return List.generate(maps.length, (i) => Payment.fromMap(maps[i]));
   }
 
-  Future<void> deletePayment(String paymentId) async {
-    final db = await database;
-    await db.delete(
-      'payments',
-      where: 'id = ?',
-      whereArgs: [paymentId],
-    );
-  }
+  // Future<void> deletePayment(String paymentId) async {
+  //   final db = await database;
+  //   await db.delete(
+  //     'payments',
+  //     where: 'id = ?',
+  //     whereArgs: [paymentId],
+  //   );
+  // }
 
   Future<void> addUnpaidSessions(
       String etudiantId, String groupId, int numberOfSessions) async {
