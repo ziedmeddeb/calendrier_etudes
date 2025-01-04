@@ -4,6 +4,7 @@ import 'package:calendrier_etude/models/seance.dart';
 import 'package:calendrier_etude/services/database_service.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:collection/collection.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final DateTime date;
@@ -339,7 +340,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         Expanded(
           child: ListView(
             children: [
-              ...widget.groupe.etudiants.map((etudiant) {
+              ...widget.groupe.etudiants
+                  .sorted(
+                      (a, b) => a.nom.compareTo(b.nom)) // Sort regular students
+                  .map((etudiant) {
                 final seance = _seanceMap[etudiant.id];
                 final isPresent = seance?.present ?? false;
 
@@ -372,12 +376,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ],
                   ),
                 ),
-              ..._externalStudents.values.map((etudiant) {
+              ..._externalStudents.values
+                  .toList() // Convert to list to enable sorting
+                  .sorted((a, b) =>
+                      a.nom.compareTo(b.nom)) // Sort external students
+                  .map((etudiant) {
                 final seance = _seanceMap[etudiant.id];
                 final isPresent = seance?.present ?? false;
 
                 return ListTile(
-                  title: Text('Étudiant: ${etudiant.nom}'),
+                  title: Text('${etudiant.nom}'),
                   subtitle: Text('(Externe)'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,

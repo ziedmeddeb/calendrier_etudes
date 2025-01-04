@@ -182,38 +182,67 @@ class DatabaseService {
   //   );
   // }
 
+  // In DatabaseService class
+
   Future<List<Seance>> getSeancesByDate(DateTime date) async {
     final db = await database;
 
-    // Format the date to match SQLite date format (YYYY-MM-DD)
-    final String formattedDate =
-        "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-
-    print('Querying seances for date: $formattedDate'); // Debug log
-
-    final List<Map<String, dynamic>> maps = await db.rawQuery(
-      'SELECT * FROM seances WHERE date(date) = date(?)',
-      [formattedDate],
+    // Create a range that covers exactly the hour we want
+    final startDateTime = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      date.hour,
     );
 
-    print('Found ${maps.length} seances'); // Debug log
+    final endDateTime = startDateTime.add(Duration(hours: 1));
+
+    final startStr = startDateTime.toIso8601String();
+    final endStr = endDateTime.toIso8601String();
+
+    print('Debug: Query time range:');
+    print('Start: $startStr');
+    print('End: $endStr');
+
+    // First, let's see what's in the database
+    final allSeances = await db.query('seances');
+    print('Debug: All seances in database:');
+    for (var seance in allSeances) {
+      print('Seance date: ${seance['date']}');
+    }
+
+    // Now perform our filtered query
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+    SELECT * FROM seances 
+    WHERE datetime(date) >= datetime(?) 
+    AND datetime(date) < datetime(?)
+  ''', [startStr, endStr]);
+
+    print('Debug: Found ${maps.length} seances for this time slot');
+    for (var seance in maps) {
+      print('Found seance: ${seance['date']}');
+    }
 
     return List.generate(maps.length, (i) {
-      print('Seance ${i + 1}: ${maps[i]}'); // Debug log for each seance
       return Seance.fromMap(maps[i]);
     });
   }
 
-// When inserting a seance, make sure to format the date consistently
   Future<void> insertSeance(Seance seance) async {
     final db = await database;
 
-    // Format the date consistently
-    final String formattedDate =
-        "${seance.date.year.toString().padLeft(4, '0')}-${seance.date.month.toString().padLeft(2, '0')}-${seance.date.day.toString().padLeft(2, '0')}";
+    // Normalize the date to store only hour precision
+    final normalizedDate = DateTime(
+      seance.date.year,
+      seance.date.month,
+      seance.date.day,
+      seance.date.hour,
+    );
 
     Map<String, dynamic> seanceMap = seance.toMap();
-    seanceMap['date'] = formattedDate;
+    seanceMap['date'] = normalizedDate.toIso8601String();
+
+    print('Debug: Inserting seance with date: ${seanceMap['date']}');
 
     await db.insert(
       'seances',
@@ -221,6 +250,79 @@ class DatabaseService {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
+
+  Future<void> cleanupSeanceDates() async {
+    final db = await database;
+
+    print('Debug: Starting date cleanup');
+
+    final List<Map<String, dynamic>> maps = await db.query('seances');
+    print('Found ${maps.length} seances to clean');
+
+    for (var map in maps) {
+      try {
+        final DateTime originalDate = DateTime.parse(map['date']);
+
+        // Normalize to hour precision
+        final normalizedDate = DateTime(
+          originalDate.year,
+          originalDate.month,
+          originalDate.day,
+          originalDate.hour,
+        );
+
+        final normalizedStr = normalizedDate.toIso8601String();
+
+        print('Cleaning seance ${map['id']}: ${map['date']} -> $normalizedStr');
+
+        await db.update(
+          'seances',
+          {'date': normalizedStr},
+          where: 'id = ?',
+          whereArgs: [map['id']],
+        );
+      } catch (e) {
+        print('Error cleaning up date for seance ${map['id']}: $e');
+      }
+    }
+
+    print('Debug: Cleanup completed');
+  }
+// // When inserting a seance, make sure to store the full datetime
+//   Future<void> insertSeance(Seance seance) async {
+//     final db = await database;
+
+//     // Format the date with time
+//     final String formattedDateTime =
+//         "${seance.date.year.toString().padLeft(4, '0')}-${seance.date.month.toString().padLeft(2, '0')}-${seance.date.day.toString().padLeft(2, '0')} ${seance.date.hour.toString().padLeft(2, '0')}:${seance.date.minute.toString().padLeft(2, '0')}:00";
+
+//     Map<String, dynamic> seanceMap = seance.toMap();
+//     seanceMap['date'] = formattedDateTime;
+
+//     await db.insert(
+//       'seances',
+//       seanceMap,
+//       conflictAlgorithm: ConflictAlgorithm.replace,
+//     );
+//   }
+
+// // When inserting a seance, make sure to format the date consistently
+//   Future<void> insertSeance(Seance seance) async {
+//     final db = await database;
+
+//     // Format the date consistently
+//     final String formattedDate =
+//         "${seance.date.year.toString().padLeft(4, '0')}-${seance.date.month.toString().padLeft(2, '0')}-${seance.date.day.toString().padLeft(2, '0')}";
+
+//     Map<String, dynamic> seanceMap = seance.toMap();
+//     seanceMap['date'] = formattedDate;
+
+//     await db.insert(
+//       'seances',
+//       seanceMap,
+//       conflictAlgorithm: ConflictAlgorithm.replace,
+//     );
+//   }
   // Future<List<Seance>> getSeances() async {
   //   final db = await database;
   //   final List<Map<String, dynamic>> maps = await db.query(
@@ -603,5 +705,23 @@ class DatabaseService {
       await db.execute(
           'ALTER TABLE custom_seances ADD COLUMN name TEXT DEFAULT "Séance"');
     }
+  }
+
+  Future<List<Seance>> getAllSeancesInRange(
+      DateTime start, DateTime end) async {
+    final db = await database;
+
+    final startStr = start.toIso8601String();
+    final endStr = end.toIso8601String();
+
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+    SELECT * FROM seances 
+    WHERE datetime(date) >= datetime(?) 
+    AND datetime(date) <= datetime(?)
+  ''', [startStr, endStr]);
+
+    return List.generate(maps.length, (i) {
+      return Seance.fromMap(maps[i]);
+    });
   }
 }

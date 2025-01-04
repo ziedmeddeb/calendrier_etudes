@@ -26,10 +26,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final groupeController = context.read<GroupeController>();
-      groupeController.addListener(_onGroupesChanged);
-      _initializeCalendar();
+      _initializeApp();
     });
+  }
+
+  Future<void> _initializeApp() async {
+    final groupeController = context.read<GroupeController>();
+    groupeController.addListener(_onGroupesChanged);
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Run all initialization steps in sequence
+      await DatabaseService().addNameColumnToTables();
+      await DatabaseService().cleanupSeanceDates();
+      await _loadAppointments();
+    } catch (e) {
+      print('Error during initialization: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -66,9 +88,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors du chargement du calendrier')),
-        );
       }
     }
   }
@@ -230,28 +249,54 @@ class _CalendarScreenState extends State<CalendarScreen> {
     List<Appointment> appointments = <Appointment>[];
     final DatabaseService databaseService = DatabaseService();
 
+    // First, fetch all seances for the time range we're interested in
+    final now = DateTime.now();
+    final startRange = now.subtract(Duration(days: 365));
+    final endRange = now.add(Duration(days: 365));
+
+    // Get all seances for this date range
+    final allSeances =
+        await databaseService.getAllSeancesInRange(startRange, endRange);
+
+    // Group seances by their date hour for quick lookup
+    final seancesByDateTime = <String, String>{};
+    for (var seance in allSeances) {
+      final key =
+          '${seance.date.year}-${seance.date.month}-${seance.date.day}-${seance.date.hour}';
+      seancesByDateTime[key] = seance.name;
+    }
+
     // Regular weekly sessions
     for (var groupe in groupes) {
       List<DateTime> occurrences = _getAllOccurrences(groupe.jour);
       for (var occurrence in occurrences) {
-        String dayName = _getDayName(occurrence.weekday);
+        final startTime = DateTime(
+          occurrence.year,
+          occurrence.month,
+          occurrence.day,
+          groupe.heureDebut.hour,
+          groupe.heureDebut.minute,
+        );
+
+        final endTime = DateTime(
+          occurrence.year,
+          occurrence.month,
+          occurrence.day,
+          groupe.heureFin.hour,
+          groupe.heureFin.minute,
+        );
+
+        // Check if we have a seance name for this time slot
+        final key =
+            '${startTime.year}-${startTime.month}-${startTime.day}-${startTime.hour}';
+        final sessionName = seancesByDateTime[key];
+
         appointments.add(Appointment(
-          startTime: DateTime(
-            occurrence.year,
-            occurrence.month,
-            occurrence.day,
-            groupe.heureDebut.hour,
-            groupe.heureDebut.minute,
-          ),
-          endTime: DateTime(
-            occurrence.year,
-            occurrence.month,
-            occurrence.day,
-            groupe.heureFin.hour,
-            groupe.heureFin.minute,
-          ),
-          subject: '${groupe.nom} - Séance',
-          color: Colors.blue,
+          startTime: startTime,
+          endTime: endTime,
+          subject:
+              sessionName != null ? '${groupe.nom} - $sessionName' : groupe.nom,
+          color: sessionName != null ? Colors.blue : Colors.red,
           notes: groupe.id,
         ));
       }
@@ -346,22 +391,34 @@ class _CalendarScreenState extends State<CalendarScreen> {
             headerDateFormat: 'MMMM yyyy',
             todayHighlightColor: Colors.blue,
             firstDayOfWeek: 1,
-            onTap: (CalendarTapDetails details) {
+            onTap: (CalendarTapDetails details) async {
+              // Make the callback async
               if (details.appointments != null &&
                   details.appointments!.isNotEmpty) {
                 final appointment = details.appointments!.first as Appointment;
                 final groupe = groupeController.groupes
                     .firstWhere((g) => g.id == appointment.notes);
 
-                Navigator.push(
+                final normalizedDate = DateTime(
+                  appointment.startTime.year,
+                  appointment.startTime.month,
+                  appointment.startTime.day,
+                  appointment.startTime.hour,
+                );
+
+                // Wait for the AttendanceScreen to pop
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => AttendanceScreen(
                       groupe: groupe,
-                      date: details.date ?? DateTime.now(),
+                      date: normalizedDate,
                     ),
                   ),
                 );
+
+                // Reload appointments after returning
+                await _loadAppointments();
               }
             },
             onLongPress: (CalendarLongPressDetails details) async {

@@ -1,5 +1,6 @@
 import 'package:calendrier_etude/add_group_screen.dart';
 import 'package:calendrier_etude/student_list_pdf.dart';
+import 'package:calendrier_etude/student_search.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'controllers/groupe_controller.dart';
@@ -15,6 +16,16 @@ class GroupManagementScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('Gestion des Groupes'),
         actions: [
+          IconButton(
+            icon: Icon(Icons.search),
+            tooltip: 'Rechercher un étudiant',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => StudentSearchScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(Icons.calendar_view_day),
             tooltip: 'Voir étudiants par jour',
