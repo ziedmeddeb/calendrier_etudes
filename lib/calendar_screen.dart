@@ -25,7 +25,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAppointments();
+    DatabaseService().addNameColumnToTables().then((_) {
+      _loadAppointments();
+    });
   }
 
   Future<void> _loadAppointments() async {
@@ -46,6 +48,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _addCustomSession(BuildContext context) async {
     final groupeController = context.read<GroupeController>();
+
+    // Get the date
     final DateTime? selectedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -55,6 +59,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     if (selectedDate == null || !mounted) return;
 
+    // Get the start time
     final TimeOfDay? startTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: 8, minute: 0),
@@ -62,6 +67,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     if (startTime == null || !mounted) return;
 
+    // Get the end time
     final TimeOfDay? endTime = await showTimePicker(
       context: context,
       initialTime:
@@ -70,6 +76,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     if (endTime == null || !mounted) return;
 
+    // Add session name input
+    final TextEditingController nameController =
+        TextEditingController(text: "Séance");
+    final String? sessionName = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Nom de la séance'),
+          content: TextField(
+            controller: nameController,
+            decoration: InputDecoration(
+              hintText: 'Entrez le nom de la séance',
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('Annuler'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text('Confirmer'),
+              onPressed: () => Navigator.of(context).pop(nameController.text),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (sessionName == null || !mounted) return;
+
+    // Select groupe
     final Groupe? selectedGroupe = await showDialog<Groupe>(
       context: context,
       builder: (BuildContext context) {
@@ -116,7 +153,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
         endTime.minute,
       );
 
-      await _saveCustomSession(selectedGroupe, startDateTime, endDateTime);
+      await _saveCustomSession(
+        selectedGroupe,
+        startDateTime,
+        endDateTime,
+        sessionName,
+      );
       await _loadAppointments();
     }
   }
@@ -125,6 +167,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     Groupe groupe,
     DateTime startDateTime,
     DateTime endDateTime,
+    String sessionName,
   ) async {
     final DatabaseService databaseService = DatabaseService();
     final customSeance = CustomSeance(
@@ -132,6 +175,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       groupeId: groupe.id,
       startTime: startDateTime,
       endTime: endDateTime,
+      name: sessionName,
     );
 
     await databaseService.insertCustomSeance(customSeance);
@@ -163,7 +207,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             groupe.heureFin.hour,
             groupe.heureFin.minute,
           ),
-          subject: '${groupe.nom} - $dayName',
+          subject: '${groupe.nom} - Séance',
           color: Colors.blue,
           notes: groupe.id,
         ));
@@ -177,7 +221,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appointments.add(Appointment(
         startTime: session.startTime,
         endTime: session.endTime,
-        subject: '${groupe.nom} (Personnalisé)',
+        subject: '${groupe.nom} - ${session.name}',
         color: Colors.green,
         notes: groupe.id,
       ));
@@ -229,10 +273,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     details.appointments!.isNotEmpty) {
                   final appointment =
                       details.appointments!.first as Appointment;
-                  final groupeId = appointment.notes;
                   final groupeController = context.read<GroupeController>();
                   final groupe = groupeController.groupes
-                      .firstWhere((g) => g.id == groupeId);
+                      .firstWhere((g) => g.id == appointment.notes);
 
                   Navigator.push(
                     context,

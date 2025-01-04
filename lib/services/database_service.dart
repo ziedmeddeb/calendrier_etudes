@@ -579,4 +579,29 @@ class DatabaseService {
       );
     }
   }
+
+  Future<void> addNameColumnToTables() async {
+    final db = await database;
+
+    // Check and add name column to seances table
+    var seancesColumns = await db.rawQuery('PRAGMA table_info(seances)');
+    bool hasNameColumnSeances =
+        seancesColumns.any((column) => column['name'] == 'name');
+
+    if (!hasNameColumnSeances) {
+      await db
+          .execute('ALTER TABLE seances ADD COLUMN name TEXT DEFAULT "Séance"');
+    }
+
+    // Check and add name column to custom_seances table
+    var customSeancesColumns =
+        await db.rawQuery('PRAGMA table_info(custom_seances)');
+    bool hasNameColumnCustom =
+        customSeancesColumns.any((column) => column['name'] == 'name');
+
+    if (!hasNameColumnCustom) {
+      await db.execute(
+          'ALTER TABLE custom_seances ADD COLUMN name TEXT DEFAULT "Séance"');
+    }
+  }
 }
