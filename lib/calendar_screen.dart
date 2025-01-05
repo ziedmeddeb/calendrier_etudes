@@ -41,8 +41,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
       // Run all initialization steps in sequence
       await DatabaseService().createHiddenSeancesTable();
-      await DatabaseService().addNameColumnToTables();
-      await DatabaseService().cleanupSeanceDates();
+      // await DatabaseService().addNameColumnToTables();
+      // await DatabaseService().cleanupSeanceDates();
       await _loadAppointments();
     } catch (e) {
       print('Error during initialization: $e');
@@ -260,18 +260,38 @@ class _CalendarScreenState extends State<CalendarScreen> {
         await databaseService.getAllSeancesInRange(startRange, endRange);
 
     // Group seances by their date hour for quick lookup
-    final seancesByDateTime = <String, String>{};
+    final seancesByDateTime = <String, Map<String, dynamic>>{};
     for (var seance in allSeances) {
       final key =
           '${seance.date.year}-${seance.date.month}-${seance.date.day}-${seance.date.hour}';
-      seancesByDateTime[key] = seance.name;
+      if (!seancesByDateTime.containsKey(key)) {
+        seancesByDateTime[key] = {
+          'name': seance.name,
+          'etudiantIds': <String>{},
+          'presenceCount': 0
+        };
+      }
+      seancesByDateTime[key]!['etudiantIds'].add(seance.etudiantId);
+      if (seance.present) {
+        seancesByDateTime[key]!['presenceCount']++;
+      }
     }
+
     // Get hidden séances
     final hiddenSeances = await databaseService.getHiddenSeances();
     final hiddenSeanceKeys = hiddenSeances.map((hs) {
       final date = DateTime.parse(hs['date'] as String);
       return '${date.year}-${date.month}-${date.day}-${date.hour}-${hs['groupe_id']}';
     }).toSet();
+
+    // Get custom sessions first
+    final customSessions = await databaseService.getCustomSeances();
+    final customSessionKeys = <String, CustomSeance>{};
+    for (var session in customSessions) {
+      final key =
+          '${session.startTime.year}-${session.startTime.month}-${session.startTime.day}-${session.startTime.hour}';
+      customSessionKeys[key] = session;
+    }
 
     // Regular weekly sessions
     for (var groupe in groupes) {
@@ -293,27 +313,64 @@ class _CalendarScreenState extends State<CalendarScreen> {
           groupe.heureFin.minute,
         );
 
-        // Check if we have a seance name for this time slot
         final key =
             '${startTime.year}-${startTime.month}-${startTime.day}-${startTime.hour}';
-        final sessionName = seancesByDateTime[key];
+        // print('Custom sessions loaded:');
+        // customSessionKeys.forEach((key, session) {
+        //   print('Key: $key, Name: ${session.name}');
+        // });
+        // Check if this is a custom session time
+        // Check if this is a custom session time
+        final customSession = customSessionKeys[key];
+        if (customSession != null && customSession.groupeId == groupe.id) {
+          // This is a custom session
+          // Debug custom session data
+          print('Custom session found - Name: ${customSession.name}');
+
+          appointments.add(Appointment(
+            startTime: customSession.startTime,
+            endTime: customSession.endTime,
+            subject: '${groupe.nom} - ${customSession.name}',
+            color: Colors.green,
+            notes: groupe.id,
+          ));
+          continue; // Skip adding regular session
+        }
+        // Regular session handling
         if (!hiddenSeanceKeys.contains('$key-${groupe.id}')) {
+          final seanceInfo = seancesByDateTime[key];
           appointments.add(Appointment(
             startTime: startTime,
             endTime: endTime,
-            subject: sessionName != null
-                ? '${groupe.nom} - $sessionName'
+            subject: seanceInfo != null
+                ? '${groupe.nom} - ${seanceInfo['name']}'
                 : groupe.nom,
-            color: sessionName != null ? Colors.blue : Colors.red,
+            color: seanceInfo != null ? Colors.blue : Colors.red,
             notes: groupe.id,
           ));
         }
       }
+    }
 
-      // Add custom sessions
-      final customSessions = await databaseService.getCustomSeances();
-      for (var session in customSessions) {
-        final groupe = groupes.firstWhere((g) => g.id == session.groupeId);
+    // Add custom sessions that don't align with regular times
+    for (var session in customSessions) {
+      final key =
+          '${session.startTime.year}-${session.startTime.month}-${session.startTime.day}-${session.startTime.hour}';
+      final groupe = groupes.firstWhere((g) => g.id == session.groupeId);
+
+      // Check if we've already added this session (in the regular sessions loop)
+      bool alreadyAdded = false;
+      for (var occurrence in _getAllOccurrences(groupe.jour)) {
+        if (occurrence.year == session.startTime.year &&
+            occurrence.month == session.startTime.month &&
+            occurrence.day == session.startTime.day &&
+            groupe.heureDebut.hour == session.startTime.hour) {
+          alreadyAdded = true;
+          break;
+        }
+      }
+
+      if (!alreadyAdded) {
         appointments.add(Appointment(
           startTime: session.startTime,
           endTime: session.endTime,

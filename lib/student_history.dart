@@ -127,6 +127,53 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
     }
   }
 
+  Future<void> _showCancelConfirmationDialog(
+      String etudiantId, DateTime date) async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Confirmer la suppression'),
+          content: const Text('Voulez-vous vraiment supprimer cette séance ? '),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Non'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('Oui'),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _deleteSeance(etudiantId, date);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteSeance(String etudiantId, DateTime date) async {
+    try {
+      await DatabaseService().deleteSeance(etudiantId, date);
+      setState(() => _refreshPayments());
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Séance supprimée avec succès'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur lors de la suppression de la séance'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _showAddPaymentDialog() async {
     final student = await DatabaseService().getEtudiantById(widget.etudiant.id);
     if (student == null) return;
@@ -267,7 +314,13 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
 
             return Column(
               children: [
-                Text('Séances non payées: ${etudiant.unpaidSessions ?? 0}'),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Séances non payées: ${etudiant.unpaidSessions ?? 0}',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -277,7 +330,7 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                     ),
                     ElevatedButton(
                       onPressed: () => _showAddPaymentDialog(),
-                      child: Text('Payer '),
+                      child: Text('Payer'),
                     ),
                   ],
                 ),
@@ -309,16 +362,56 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                       } else {
                         final seances = snapshot.data!;
 
-                        return ListView.builder(
-                          itemCount: seances.length,
-                          itemBuilder: (context, index) {
-                            final seance = seances[index];
-                            return ListTile(
-                              title: Text('Date: ${_formatDate(seance.date)}'),
-                              subtitle: Text(
-                                  'Present: ${seance.present ? "Oui" : "Non"}'),
-                            );
-                          },
+                        return Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                'Nombre total de séances: ${seances.length}',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: ListView.separated(
+                                itemCount: seances.length,
+                                separatorBuilder: (context, index) => Divider(
+                                  height: 1,
+                                  color: Colors.grey[300],
+                                ),
+                                itemBuilder: (context, index) {
+                                  final seance = seances[index];
+                                  return ListTile(
+                                    title: Text(
+                                      'Date: ${_formatDate(seance.date)}',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w500),
+                                    ),
+                                    subtitle: Text(
+                                      'Present: ${seance.present ? "Oui" : "Non"}',
+                                      style: TextStyle(
+                                        color: seance.present
+                                            ? Colors.green
+                                            : Colors.red,
+                                      ),
+                                    ),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.cancel,
+                                          color: Colors.red),
+                                      onPressed: () =>
+                                          _showCancelConfirmationDialog(
+                                        etudiant.id,
+                                        seance.date,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         );
                       }
                     },

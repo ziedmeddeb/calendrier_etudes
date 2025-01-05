@@ -71,6 +71,7 @@ class DatabaseService {
         groupeId TEXT,
         startTime TEXT,
         endTime TEXT,
+        name TEXT DEFAULT 'Séance',
         FOREIGN KEY (groupeId) REFERENCES groupes (id)
       )
     ''');
@@ -422,17 +423,50 @@ class DatabaseService {
 
   Future<void> insertCustomSeance(CustomSeance customSeance) async {
     final db = await database;
+    print('Debug: Inserting custom seance with name: ${customSeance.name}');
+
+    // Explicitly include all fields in the insert
+    final map = {
+      'id': customSeance.id,
+      'groupeId': customSeance.groupeId,
+      'startTime': customSeance.startTime.toIso8601String(),
+      'endTime': customSeance.endTime.toIso8601String(),
+      'name': customSeance.name,
+    };
+
+    print('Debug: Inserting map: $map');
+
     await db.insert(
       'custom_seances',
-      customSeance.toMap(),
+      map,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    // Verify the insertion
+    final inserted = await db.query(
+      'custom_seances',
+      where: 'id = ?',
+      whereArgs: [customSeance.id],
+    );
+    print('Debug: Inserted record: ${inserted.first}');
   }
 
   Future<List<CustomSeance>> getCustomSeances() async {
     final db = await database;
+
+    // First, let's check the table structure
+    final tableInfo = await db.rawQuery('PRAGMA table_info(custom_seances)');
+    print('Debug: Table structure:');
+    print(tableInfo);
+
     final List<Map<String, dynamic>> maps = await db.query('custom_seances');
-    return List.generate(maps.length, (i) => CustomSeance.fromMap(maps[i]));
+    print('Debug: Raw custom seances data: $maps');
+
+    return List.generate(maps.length, (i) {
+      final customSeance = CustomSeance.fromMap(maps[i]);
+      print('Debug: Created CustomSeance with name: ${customSeance.name}');
+      return customSeance;
+    });
   }
 
   Future<void> deleteCustomSeance(String id) async {
@@ -497,14 +531,23 @@ class DatabaseService {
     return null;
   }
 
-  Future<void> updateSeance(Seance seance) async {
+  Future<void> updateSeance(Seance seance, String groupid) async {
     final db = await database;
+
+    // First update the seance
     await db.update(
       'seances',
       seance.toMap(),
       where: 'id = ?',
       whereArgs: [seance.id],
     );
+
+    // Get the student to find their group
+    final student = await getEtudiantById(seance.etudiantId);
+    if (student != null) {
+      // Also update any matching custom session
+      await updateCustomSessionName(seance.date, groupid, seance.name);
+    }
   }
 
   Future<String?> findStudentOriginalGroup(String studentId) async {
@@ -755,5 +798,144 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getHiddenSeances() async {
     final db = await database;
     return await db.query('hidden_seances');
+  }
+
+  Future<void> deleteSeance(String etudiantId, DateTime date) async {
+    final db = await database;
+
+    try {
+      // Normalize the date to hour precision
+      final normalizedDate = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        date.hour,
+      );
+      final dateStr = normalizedDate.toIso8601String();
+
+      print(
+          'Debug: Attempting to delete seance for student $etudiantId on date $dateStr');
+
+      // Get the seance before deleting to check if it was marked as present
+      final List<Map<String, dynamic>> seances = await db.query(
+        'seances',
+        where: 'etudiantId = ? AND date = ?',
+        whereArgs: [etudiantId, dateStr],
+      );
+
+      if (seances.isNotEmpty) {
+        final seance = seances.first;
+        final wasPresent = seance['present'] == 1;
+
+        // Use a transaction to ensure both operations complete together
+        await db.transaction((txn) async {
+          // Delete the seance
+          await txn.delete(
+            'seances',
+            where: 'etudiantId = ? AND date = ?',
+            whereArgs: [etudiantId, dateStr],
+          );
+
+          print('Debug: Seance deleted successfully');
+
+          // If the student was marked as present, decrement their unpaid sessions
+          if (wasPresent) {
+            // Get the student's current unpaid sessions count
+            final List<Map<String, dynamic>> studentResult = await txn.query(
+              'etudiants',
+              columns: ['unpaidSessions', 'groupeId'],
+              where: 'id = ?',
+              whereArgs: [etudiantId],
+            );
+
+            if (studentResult.isNotEmpty) {
+              final currentUnpaidSessions =
+                  studentResult.first['unpaidSessions'] as int;
+              final groupId = studentResult.first['groupeId'] as String;
+
+              // Update the student's unpaid sessions
+              await txn.update(
+                'etudiants',
+                {
+                  'unpaidSessions':
+                      currentUnpaidSessions > 0 ? currentUnpaidSessions - 1 : 0,
+                  'groupeId': groupId // Preserve the original group ID
+                },
+                where: 'id = ?',
+                whereArgs: [etudiantId],
+              );
+
+              print('Debug: Updated unpaid sessions for student $etudiantId');
+            }
+          }
+        });
+      } else {
+        print('Debug: No seance found to delete');
+      }
+    } catch (e) {
+      print('Error in deleteSeance: $e');
+      throw e; // Re-throw the error for handling in the UI
+    }
+  }
+
+  Future<void> deleteAllSeances() async {
+    final db = await database;
+    await db.delete('seances');
+    await db.delete('hidden_seances');
+    await db.delete('payments');
+  }
+
+  Future<void> resetEtudiantUnpaidSessions() async {
+    final db = await database;
+    await db.update(
+      'etudiants',
+      {
+        'unpaidSessions': 0,
+        // Ensure we keep the original group ID
+      },
+    );
+  }
+
+  Future<String?> getCustomSessionName(DateTime date, String groupId) async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> customSessions = await db.query(
+      'custom_seances',
+      where: 'groupeId = ? AND date(startTime) = date(?)',
+      whereArgs: [
+        groupId,
+        date.toIso8601String(),
+      ],
+    );
+
+    if (customSessions.isNotEmpty) {
+      return customSessions.first['name'] as String?;
+    }
+    return null;
+  }
+
+  Future<void> updateCustomSessionName(
+      DateTime date, String groupId, String newName) async {
+    final db = await database;
+
+    // Find any custom session that matches this date and group
+    final List<Map<String, dynamic>> customSessions = await db.query(
+      'custom_seances',
+      where: 'groupeId = ? AND date(startTime) = date(?)',
+      whereArgs: [
+        groupId,
+        date.toIso8601String(),
+      ],
+    );
+
+    // If we found a matching custom session, update its name
+    if (customSessions.isNotEmpty) {
+      await db.update(
+        'custom_seances',
+        {'name': newName},
+        where: 'id = ?',
+        whereArgs: [customSessions.first['id']],
+      );
+    }
   }
 }

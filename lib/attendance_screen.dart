@@ -33,6 +33,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSeances();
+      // DatabaseService().deleteAllSeances();
+      // DatabaseService().resetEtudiantUnpaidSessions();
     });
   }
 
@@ -52,12 +54,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
       if (!mounted) return;
 
+      // Check for custom session name
+      final customName = await _databaseService.getCustomSessionName(
+        widget.date,
+        widget.groupe.id,
+      );
+
       setState(() {
         _isLoading = false;
         _dataLoaded = true;
 
-        // Set session name from first seance found, or keep default
-        if (_seanceMap.isNotEmpty) {
+        // Set session name prioritizing custom session name if it exists
+        if (customName != null) {
+          _sessionName = customName;
+        } else if (_seanceMap.isNotEmpty) {
           _sessionName = _seanceMap.values.first.name;
         }
       });
@@ -277,6 +287,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           );
         });
       });
+
+      // Also update custom session name if it exists
+      await _databaseService.updateCustomSessionName(
+        widget.date,
+        widget.groupe.id,
+        newName,
+      );
     }
   }
 
@@ -414,25 +431,70 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  void _toggleAttendance(String etudiantId) {
+  void _toggleAttendance(String etudiantId) async {
     if (_isLoading) return;
 
-    setState(() {
-      var seance = _seanceMap[etudiantId];
-      if (seance == null) {
-        seance = Seance(
+    var seance = _seanceMap[etudiantId];
+    if (seance == null) {
+      // Create new seance (marked as present)
+      setState(() {
+        _seanceMap[etudiantId] = Seance(
           id: Uuid().v4(),
           date: widget.date,
           etudiantId: etudiantId,
           present: true,
           name: _sessionName,
         );
-        _seanceMap[etudiantId] = seance;
+        _hasChanges = true;
+      });
+    } else {
+      if (seance.present) {
+        // If currently present, delete the seance
+        try {
+          setState(() {
+            _isLoading = true;
+          });
+
+          await _databaseService.deleteSeance(etudiantId, widget.date);
+
+          setState(() {
+            _seanceMap.remove(etudiantId);
+            _hasChanges = false; // No need to save since we've already deleted
+            _isLoading = false;
+          });
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Présence supprimée')),
+          );
+        } catch (e) {
+          print('Error toggling attendance: $e');
+          setState(() {
+            _isLoading = false;
+          });
+
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de la suppression de la présence'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } else {
-        seance.present = !seance.present;
+        // If currently absent, mark as present
+        setState(() {
+          _seanceMap[etudiantId] = Seance(
+            id: seance.id,
+            date: seance.date,
+            etudiantId: seance.etudiantId,
+            present: true,
+            name: _sessionName,
+          );
+          _hasChanges = true;
+        });
       }
-      _hasChanges = true;
-    });
+    }
   }
 
   @override
