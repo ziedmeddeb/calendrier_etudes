@@ -3,12 +3,14 @@ class Seance {
   final DateTime date;
   final String etudiantId;
   bool present;
+  final String name;
 
   Seance({
     required this.id,
     required this.date,
     required this.etudiantId,
     required this.present,
+    this.name = 'Séance',
   });
 
   Map<String, dynamic> toMap() {
@@ -18,6 +20,7 @@ class Seance {
           "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}",
       'etudiantId': etudiantId,
       'present': present ? 1 : 0,
+      'name': name,
     };
   }
 
@@ -27,6 +30,7 @@ class Seance {
       date: DateTime.parse(map['date']),
       etudiantId: map['etudiantId'],
       present: map['present'] == 1,
+      name: map['name'] ?? 'Séance',
     );
   }
 }

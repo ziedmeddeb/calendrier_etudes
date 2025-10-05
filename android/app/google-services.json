@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "520666554418",
+    "project_id": "calendrier-etudes-b4438",
+    "storage_bucket": "calendrier-etudes-b4438.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:520666554418:android:ef51f40502f6124a865c2b",
+        "android_client_info": {
+          "package_name": "com.example.calendrier_etude"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjsUINkVRldBlPDZWYwqUlYqJejILYB_Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

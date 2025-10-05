@@ -4,12 +4,16 @@ import 'package:calendrier_etude/models/seance.dart';
 import 'package:calendrier_etude/services/database_service.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:collection/collection.dart';
 
 class AttendanceScreen extends StatefulWidget {
   final DateTime date;
   final Groupe groupe;
 
-  AttendanceScreen({required this.date, required this.groupe});
+  AttendanceScreen({
+    required this.date,
+    required this.groupe,
+  });
 
   @override
   _AttendanceScreenState createState() => _AttendanceScreenState();
@@ -22,12 +26,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _hasChanges = false;
   bool _dataLoaded = false;
   final DatabaseService _databaseService = DatabaseService();
+  String _sessionName = 'Séance';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadSeances();
+      // DatabaseService().deleteAllSeances();
+      // DatabaseService().resetEtudiantUnpaidSessions();
     });
   }
 
@@ -47,9 +54,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
       if (!mounted) return;
 
+      // Check for custom session name
+      final customName = await _databaseService.getCustomSessionName(
+        widget.date,
+        widget.groupe.id,
+      );
+
       setState(() {
         _isLoading = false;
         _dataLoaded = true;
+
+        // Set session name prioritizing custom session name if it exists
+        if (customName != null) {
+          _sessionName = customName;
+        } else if (_seanceMap.isNotEmpty) {
+          _sessionName = _seanceMap.values.first.name;
+        }
       });
     } catch (e) {
       print('Error loading seances: $e');
@@ -222,6 +242,61 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
   }
 
+  Future<void> _editSessionName() async {
+    final TextEditingController controller =
+        TextEditingController(text: _sessionName);
+    final String? newName = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Modifier le nom de la séance'),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: 'Entrez le nouveau nom',
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(controller.text),
+              child: Text('Confirmer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newName != null && newName.isNotEmpty && newName != _sessionName) {
+      setState(() {
+        _sessionName = newName;
+        _hasChanges = true;
+
+        // Update session name in all seances
+        _seanceMap.forEach((etudiantId, seance) {
+          _seanceMap[etudiantId] = Seance(
+            id: seance.id,
+            date: seance.date,
+            etudiantId: seance.etudiantId,
+            present: seance.present,
+            name: newName,
+          );
+        });
+      });
+
+      // Also update custom session name if it exists
+      await _databaseService.updateCustomSessionName(
+        widget.date,
+        widget.groupe.id,
+        newName,
+      );
+    }
+  }
+
   Widget _buildContent() {
     if (!_dataLoaded) {
       return Center(child: Text('Aucune donnée disponible'));
@@ -235,17 +310,27 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                _sessionName,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).primaryColor,
+                ),
+              ),
+              SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     'Date: ${widget.date.day}/${widget.date.month}/${widget.date.year}',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                   ),
                   Text(
                     'Total étudiants: $totalStudents',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -255,7 +340,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 children: [
                   if (_externalStudents.isNotEmpty)
                     Text(
-                        '(${widget.groupe.etudiants.length} réguliers, ${_externalStudents.length} externes)'),
+                      '(${widget.groupe.etudiants.length} réguliers, ${_externalStudents.length} externes)',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
                   ElevatedButton.icon(
                     icon: Icon(Icons.person_add),
                     label: Text('Ajouter étudiant'),
@@ -266,10 +353,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ],
           ),
         ),
+        Divider(thickness: 1),
         Expanded(
           child: ListView(
             children: [
-              ...widget.groupe.etudiants.map((etudiant) {
+              ...widget.groupe.etudiants
+                  .sorted(
+                      (a, b) => a.nom.compareTo(b.nom)) // Sort regular students
+                  .map((etudiant) {
                 final seance = _seanceMap[etudiant.id];
                 final isPresent = seance?.present ?? false;
 
@@ -302,12 +393,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     ],
                   ),
                 ),
-              ..._externalStudents.values.map((etudiant) {
+              ..._externalStudents.values
+                  .toList() // Convert to list to enable sorting
+                  .sorted((a, b) =>
+                      a.nom.compareTo(b.nom)) // Sort external students
+                  .map((etudiant) {
                 final seance = _seanceMap[etudiant.id];
                 final isPresent = seance?.present ?? false;
 
                 return ListTile(
-                  title: Text('Étudiant: ${etudiant.nom}'),
+                  title: Text('${etudiant.nom}'),
                   subtitle: Text('(Externe)'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -336,26 +431,70 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  void _toggleAttendance(String etudiantId) {
+  void _toggleAttendance(String etudiantId) async {
     if (_isLoading) return;
 
-    setState(() {
-      var seance = _seanceMap[etudiantId];
-      if (seance == null) {
-        // Create a new seance if one doesn't exist
-        seance = Seance(
+    var seance = _seanceMap[etudiantId];
+    if (seance == null) {
+      // Create new seance (marked as present)
+      setState(() {
+        _seanceMap[etudiantId] = Seance(
           id: Uuid().v4(),
           date: widget.date,
           etudiantId: etudiantId,
-          present:
-              true, // Start as present since we're creating it on first toggle
+          present: true,
+          name: _sessionName,
         );
-        _seanceMap[etudiantId] = seance;
+        _hasChanges = true;
+      });
+    } else {
+      if (seance.present) {
+        // If currently present, delete the seance
+        try {
+          setState(() {
+            _isLoading = true;
+          });
+
+          await _databaseService.deleteSeance(etudiantId, widget.date);
+
+          setState(() {
+            _seanceMap.remove(etudiantId);
+            _hasChanges = false; // No need to save since we've already deleted
+            _isLoading = false;
+          });
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Présence supprimée')),
+          );
+        } catch (e) {
+          print('Error toggling attendance: $e');
+          setState(() {
+            _isLoading = false;
+          });
+
+          // Show error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de la suppression de la présence'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       } else {
-        seance.present = !seance.present;
+        // If currently absent, mark as present
+        setState(() {
+          _seanceMap[etudiantId] = Seance(
+            id: seance.id,
+            date: seance.date,
+            etudiantId: seance.etudiantId,
+            present: true,
+            name: _sessionName,
+          );
+          _hasChanges = true;
+        });
       }
-      _hasChanges = true;
-    });
+    }
   }
 
   @override
@@ -364,6 +503,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       appBar: AppBar(
         title: Text('Présence - ${widget.groupe.nom}'),
         actions: [
+          IconButton(
+            icon: Icon(Icons.edit),
+            onPressed: _editSessionName,
+            tooltip: 'Modifier le nom de la séance',
+          ),
           if (_hasChanges && !_isLoading)
             IconButton(
               icon: Icon(Icons.save),

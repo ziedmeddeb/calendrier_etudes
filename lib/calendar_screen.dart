@@ -25,18 +25,83 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeApp();
+    });
+  }
+
+  Future<void> _initializeApp() async {
+    final groupeController = context.read<GroupeController>();
+    groupeController.addListener(_onGroupesChanged);
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Run all initialization steps in sequence
+      await DatabaseService().createHiddenSeancesTable();
+      // await DatabaseService().addNameColumnToTables();
+      // await DatabaseService().cleanupSeanceDates();
+      await _loadAppointments();
+    } catch (e) {
+      print('Error during initialization: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    final groupeController = context.read<GroupeController>();
+    groupeController.removeListener(_onGroupesChanged);
+    super.dispose();
+  }
+
+  void _onGroupesChanged() {
     _loadAppointments();
   }
 
+  Future<void> _initializeCalendar() async {
+    await DatabaseService().addNameColumnToTables();
+    await _loadAppointments();
+  }
+
   Future<void> _loadAppointments() async {
-    final appointments = await _getDataSource();
-    if (mounted) {
-      setState(() {
-        _appointments = appointments;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final appointments = await _getDataSource();
+      if (mounted) {
+        setState(() {
+          _appointments = appointments;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
+
+  // Future<void> _loadAppointments() async {
+  //   final appointments = await _getDataSource();
+  //   if (mounted) {
+  //     setState(() {
+  //       _appointments = appointments;
+  //       _isLoading = false;
+  //     });
+  //   }
+  // }
 
   Future<void> _deleteCustomSession(CustomSeance session) async {
     final DatabaseService databaseService = DatabaseService();
@@ -46,6 +111,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _addCustomSession(BuildContext context) async {
     final groupeController = context.read<GroupeController>();
+
+    // Get the date
     final DateTime? selectedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -55,6 +122,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     if (selectedDate == null || !mounted) return;
 
+    // Get the start time
     final TimeOfDay? startTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: 8, minute: 0),
@@ -62,6 +130,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     if (startTime == null || !mounted) return;
 
+    // Get the end time
     final TimeOfDay? endTime = await showTimePicker(
       context: context,
       initialTime:
@@ -70,6 +139,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     if (endTime == null || !mounted) return;
 
+    // Add session name input
+    final TextEditingController nameController =
+        TextEditingController(text: "Séance");
+    final String? sessionName = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Nom de la séance'),
+          content: TextField(
+            controller: nameController,
+            decoration: InputDecoration(
+              hintText: 'Entrez le nom de la séance',
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('Annuler'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text('Confirmer'),
+              onPressed: () => Navigator.of(context).pop(nameController.text),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (sessionName == null || !mounted) return;
+
+    // Select groupe
     final Groupe? selectedGroupe = await showDialog<Groupe>(
       context: context,
       builder: (BuildContext context) {
@@ -116,7 +216,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
         endTime.minute,
       );
 
-      await _saveCustomSession(selectedGroupe, startDateTime, endDateTime);
+      await _saveCustomSession(
+        selectedGroupe,
+        startDateTime,
+        endDateTime,
+        sessionName,
+      );
       await _loadAppointments();
     }
   }
@@ -125,6 +230,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     Groupe groupe,
     DateTime startDateTime,
     DateTime endDateTime,
+    String sessionName,
   ) async {
     final DatabaseService databaseService = DatabaseService();
     final customSeance = CustomSeance(
@@ -132,6 +238,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       groupeId: groupe.id,
       startTime: startDateTime,
       endTime: endDateTime,
+      name: sessionName,
     );
 
     await databaseService.insertCustomSeance(customSeance);
@@ -143,44 +250,135 @@ class _CalendarScreenState extends State<CalendarScreen> {
     List<Appointment> appointments = <Appointment>[];
     final DatabaseService databaseService = DatabaseService();
 
+    // First, fetch all seances for the time range we're interested in
+    final now = DateTime.now();
+    final startRange = now.subtract(Duration(days: 365));
+    final endRange = now.add(Duration(days: 365));
+
+    // Get all seances for this date range
+    final allSeances =
+        await databaseService.getAllSeancesInRange(startRange, endRange);
+
+    // Group seances by their date hour for quick lookup
+    final seancesByDateTime = <String, Map<String, dynamic>>{};
+    for (var seance in allSeances) {
+      final key =
+          '${seance.date.year}-${seance.date.month}-${seance.date.day}-${seance.date.hour}';
+      if (!seancesByDateTime.containsKey(key)) {
+        seancesByDateTime[key] = {
+          'name': seance.name,
+          'etudiantIds': <String>{},
+          'presenceCount': 0
+        };
+      }
+      seancesByDateTime[key]!['etudiantIds'].add(seance.etudiantId);
+      if (seance.present) {
+        seancesByDateTime[key]!['presenceCount']++;
+      }
+    }
+
+    // Get hidden séances
+    final hiddenSeances = await databaseService.getHiddenSeances();
+    final hiddenSeanceKeys = hiddenSeances.map((hs) {
+      final date = DateTime.parse(hs['date'] as String);
+      return '${date.year}-${date.month}-${date.day}-${date.hour}-${hs['groupe_id']}';
+    }).toSet();
+
+    // Get custom sessions first
+    final customSessions = await databaseService.getCustomSeances();
+    final customSessionKeys = <String, CustomSeance>{};
+    for (var session in customSessions) {
+      final key =
+          '${session.startTime.year}-${session.startTime.month}-${session.startTime.day}-${session.startTime.hour}';
+      customSessionKeys[key] = session;
+    }
+
     // Regular weekly sessions
     for (var groupe in groupes) {
       List<DateTime> occurrences = _getAllOccurrences(groupe.jour);
       for (var occurrence in occurrences) {
-        String dayName = _getDayName(occurrence.weekday);
-        appointments.add(Appointment(
-          startTime: DateTime(
-            occurrence.year,
-            occurrence.month,
-            occurrence.day,
-            groupe.heureDebut.hour,
-            groupe.heureDebut.minute,
-          ),
-          endTime: DateTime(
-            occurrence.year,
-            occurrence.month,
-            occurrence.day,
-            groupe.heureFin.hour,
-            groupe.heureFin.minute,
-          ),
-          subject: '${groupe.nom} - $dayName',
-          color: Colors.blue,
-          notes: groupe.id,
-        ));
+        final startTime = DateTime(
+          occurrence.year,
+          occurrence.month,
+          occurrence.day,
+          groupe.heureDebut.hour,
+          groupe.heureDebut.minute,
+        );
+
+        final endTime = DateTime(
+          occurrence.year,
+          occurrence.month,
+          occurrence.day,
+          groupe.heureFin.hour,
+          groupe.heureFin.minute,
+        );
+
+        final key =
+            '${startTime.year}-${startTime.month}-${startTime.day}-${startTime.hour}';
+        // print('Custom sessions loaded:');
+        // customSessionKeys.forEach((key, session) {
+        //   print('Key: $key, Name: ${session.name}');
+        // });
+        // Check if this is a custom session time
+        // Check if this is a custom session time
+        final customSession = customSessionKeys[key];
+        if (customSession != null && customSession.groupeId == groupe.id) {
+          // This is a custom session
+          // Debug custom session data
+          print('Custom session found - Name: ${customSession.name}');
+
+          appointments.add(Appointment(
+            startTime: customSession.startTime,
+            endTime: customSession.endTime,
+            subject: '${groupe.nom} - ${customSession.name}',
+            color: Colors.green,
+            notes: groupe.id,
+          ));
+          continue; // Skip adding regular session
+        }
+        // Regular session handling
+        if (!hiddenSeanceKeys.contains('$key-${groupe.id}')) {
+          final seanceInfo = seancesByDateTime[key];
+          appointments.add(Appointment(
+            startTime: startTime,
+            endTime: endTime,
+            subject: seanceInfo != null
+                ? '${groupe.nom} - ${seanceInfo['name']}'
+                : groupe.nom,
+            color: seanceInfo != null ? Colors.blue : Colors.red,
+            notes: groupe.id,
+          ));
+        }
       }
     }
 
-    // Add custom sessions
-    final customSessions = await databaseService.getCustomSeances();
+    // Add custom sessions that don't align with regular times
     for (var session in customSessions) {
+      final key =
+          '${session.startTime.year}-${session.startTime.month}-${session.startTime.day}-${session.startTime.hour}';
       final groupe = groupes.firstWhere((g) => g.id == session.groupeId);
-      appointments.add(Appointment(
-        startTime: session.startTime,
-        endTime: session.endTime,
-        subject: '${groupe.nom} (Personnalisé)',
-        color: Colors.green,
-        notes: groupe.id,
-      ));
+
+      // Check if we've already added this session (in the regular sessions loop)
+      bool alreadyAdded = false;
+      for (var occurrence in _getAllOccurrences(groupe.jour)) {
+        if (occurrence.year == session.startTime.year &&
+            occurrence.month == session.startTime.month &&
+            occurrence.day == session.startTime.day &&
+            groupe.heureDebut.hour == session.startTime.hour) {
+          alreadyAdded = true;
+          break;
+        }
+      }
+
+      if (!alreadyAdded) {
+        appointments.add(Appointment(
+          startTime: session.startTime,
+          endTime: session.endTime,
+          subject: '${groupe.nom} - ${session.name}',
+          color: Colors.green,
+          notes: groupe.id,
+        ));
+      }
     }
 
     return appointments;
@@ -192,7 +390,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
       appBar: AppBar(
         title: Text('Calendrier'),
         actions: [
-          // ... existing PopupMenuButton code ...
+          PopupMenuButton<CalendarView>(
+            icon: Icon(Icons.calendar_today),
+            tooltip: 'Changer la vue',
+            initialValue: _currentView,
+            onSelected: (CalendarView newView) {
+              setState(() {
+                _currentView = newView;
+                _calendarController.view = newView;
+              });
+            },
+            itemBuilder: (BuildContext context) => [
+              PopupMenuItem(
+                value: CalendarView.day,
+                child: Text('Vue journalière'),
+              ),
+              PopupMenuItem(
+                value: CalendarView.week,
+                child: Text('Vue semaine'),
+              ),
+              PopupMenuItem(
+                value: CalendarView.month,
+                child: Text('Vue mois'),
+              ),
+            ],
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -200,59 +422,107 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: Icon(Icons.add),
         tooltip: 'Ajouter une séance personnalisée',
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : SfCalendar(
-              controller: _calendarController,
-              view: _currentView,
-              dataSource: MeetingDataSource(_appointments),
-              timeSlotViewSettings: TimeSlotViewSettings(
-                startHour: 7,
-                endHour: 23,
-                timeFormat: 'HH:mm',
-              ),
-              viewHeaderStyle: ViewHeaderStyle(
-                dayTextStyle: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              monthViewSettings: MonthViewSettings(
-                appointmentDisplayMode: MonthAppointmentDisplayMode.appointment,
-              ),
-              headerDateFormat: 'MMMM yyyy',
-              todayHighlightColor: Colors.blue,
-              firstDayOfWeek: 1,
-              onTap: (CalendarTapDetails details) {
-                if (details.appointments != null &&
-                    details.appointments!.isNotEmpty) {
-                  final appointment =
-                      details.appointments!.first as Appointment;
-                  final groupeId = appointment.notes;
-                  final groupeController = context.read<GroupeController>();
-                  final groupe = groupeController.groupes
-                      .firstWhere((g) => g.id == groupeId);
+      body: Consumer<GroupeController>(
+        builder: (context, groupeController, child) {
+          if (_isLoading) {
+            return Center(child: CircularProgressIndicator());
+          }
 
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AttendanceScreen(
-                        groupe: groupe,
-                        date: details.date ?? DateTime.now(),
-                      ),
+          if (groupeController.groupes.isEmpty) {
+            return Center(
+              child:
+                  Text('Veuillez ajouter des groupes pour voir le calendrier'),
+            );
+          }
+
+          return SfCalendar(
+            controller: _calendarController,
+            view: _currentView,
+            dataSource: MeetingDataSource(_appointments),
+            timeSlotViewSettings: TimeSlotViewSettings(
+              startHour: 7,
+              endHour: 23,
+              timeFormat: 'HH:mm',
+            ),
+            viewHeaderStyle: ViewHeaderStyle(
+              dayTextStyle: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            monthViewSettings: MonthViewSettings(
+              appointmentDisplayMode: MonthAppointmentDisplayMode.appointment,
+            ),
+            headerDateFormat: 'MMMM yyyy',
+            todayHighlightColor: Colors.blue,
+            firstDayOfWeek: 1,
+            onTap: (CalendarTapDetails details) async {
+              // Make the callback async
+              if (details.appointments != null &&
+                  details.appointments!.isNotEmpty) {
+                final appointment = details.appointments!.first as Appointment;
+                final groupe = groupeController.groupes
+                    .firstWhere((g) => g.id == appointment.notes);
+
+                final normalizedDate = DateTime(
+                  appointment.startTime.year,
+                  appointment.startTime.month,
+                  appointment.startTime.day,
+                  appointment.startTime.hour,
+                );
+
+                // Wait for the AttendanceScreen to pop
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AttendanceScreen(
+                      groupe: groupe,
+                      date: normalizedDate,
                     ),
-                  );
-                }
-              },
-              onLongPress: (CalendarLongPressDetails details) async {
-                if (details.appointments != null &&
-                    details.appointments!.isNotEmpty) {
-                  final appointment =
-                      details.appointments!.first as Appointment;
+                  ),
+                );
 
-                  // Check if the long-pressed appointment is a custom session
-                  if (appointment.color == Colors.green) {
+                // Reload appointments after returning
+                await _loadAppointments();
+              }
+            },
+            onLongPress: (CalendarLongPressDetails details) async {
+              if (details.appointments != null &&
+                  details.appointments!.isNotEmpty) {
+                final appointment = details.appointments!.first as Appointment;
+
+                // Show options menu
+                await showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: Text('Options de la séance'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (appointment.color == Colors.green)
+                            ListTile(
+                              leading: Icon(Icons.delete),
+                              title: Text('Supprimer la séance personnalisée'),
+                              onTap: () async {
+                                Navigator.of(context).pop('delete');
+                              },
+                            ),
+                          if (appointment.color != Colors.green)
+                            ListTile(
+                              leading: Icon(Icons.visibility_off),
+                              title: Text('Masquer cette séance'),
+                              onTap: () async {
+                                Navigator.of(context).pop('hide');
+                              },
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ).then((result) async {
+                  if (result == 'delete') {
                     final shouldDelete = await showDialog<bool>(
                       context: context,
                       builder: (BuildContext context) {
@@ -275,20 +545,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     );
 
                     if (shouldDelete == true) {
-                      // Retrieve the CustomSeance instance
                       final customSessions =
                           await DatabaseService().getCustomSeances();
+
                       final session = customSessions.firstWhere((s) =>
                           s.startTime == appointment.startTime &&
                           s.endTime == appointment.endTime);
-
-                      await _deleteCustomSession(session); // Delete the session
-                      await _loadAppointments(); // Reload appointments
+                      await _deleteCustomSession(session);
                     }
+                  } else if (result == 'hide') {
+                    // Hide the séance
+                    final groupe = groupeController.groupes
+                        .firstWhere((g) => g.id == appointment.notes);
+                    await DatabaseService()
+                        .hideSeance(appointment.startTime, groupe.id);
                   }
-                }
-              },
-            ),
+                  await _loadAppointments();
+                });
+              }
+            },
+          );
+        },
+      ),
     );
   }
 
