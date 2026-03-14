@@ -70,7 +70,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final gains = _totalPaid * _sessionPrice;
-    final pertes = _totalUnpaid * _sessionPrice;
+    final manques = _totalUnpaid * _sessionPrice;
+    final total = gains + manques;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -210,8 +211,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         icon: Icons.trending_down,
                         iconColor: const Color(0xFFEF4444),
                         bgColor: const Color(0xFFFEF2F2),
-                        label: 'Pertes (séances impayées)',
-                        value: '-${pertes.toStringAsFixed(0)} DT',
+                        label: 'Manques (séances impayées)',
+                        value: '${manques.toStringAsFixed(0)} DT',
                         valueColor: const Color(0xFFEF4444),
                       ),
                       const SizedBox(height: 10),
@@ -227,9 +228,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ],
                           border: Border.all(
-                            color: (gains - pertes) >= 0
-                                ? const Color(0xFF10B981).withOpacity(0.3)
-                                : const Color(0xFFEF4444).withOpacity(0.3),
+                            color: const Color(0xFF2563EB).withOpacity(0.3),
                           ),
                         ),
                         padding: const EdgeInsets.all(16),
@@ -250,19 +249,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Solde net',
+                                  const Text('Total',
                                       style: TextStyle(
                                           fontSize: 13,
                                           color: Color(0xFF64748B))),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${(gains - pertes).toStringAsFixed(0)} DT',
-                                    style: TextStyle(
+                                    '${total.toStringAsFixed(0)} DT',
+                                    style: const TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.w800,
-                                      color: (gains - pertes) >= 0
-                                          ? const Color(0xFF10B981)
-                                          : const Color(0xFFEF4444),
+                                      color: Color(0xFF2563EB),
                                     ),
                                   ),
                                 ],
