@@ -16,12 +16,14 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _studentNameController;
   late TextEditingController _studentLyceeController;
+  late bool _isGratuit;
 
   @override
   void initState() {
     super.initState();
     _studentNameController = TextEditingController(text: widget.etudiant.nom);
     _studentLyceeController = TextEditingController(text: widget.etudiant.lycee);
+    _isGratuit = widget.etudiant.isGratuit;
   }
 
   void _submitForm() {
@@ -31,6 +33,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
         nom: _studentNameController.text,
         lycee: _studentLyceeController.text,
         unpaidSessions: widget.etudiant.unpaidSessions,
+        isGratuit: _isGratuit,
       );
       Provider.of<GroupeController>(context, listen: false)
           .modifierEtudiantDuGroupe(widget.groupeId, updatedEtudiant);
@@ -89,6 +92,23 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
                         if (value == null || value.isEmpty) return 'Veuillez entrer un lycée';
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      value: _isGratuit,
+                      onChanged: (value) {
+                        setState(() {
+                          _isGratuit = value ?? false;
+                        });
+                      },
+                      title: const Text('Étudiant gratuit',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                      subtitle: const Text(
+                          'Les séances ne seront pas comptées comme impayées',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: const Color(0xFF2563EB),
                     ),
                   ],
                 ),

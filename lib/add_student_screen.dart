@@ -18,6 +18,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   final _studentNameController = TextEditingController();
   final _studentLyceeController = TextEditingController();
   final _searchController = TextEditingController();
+  bool _isGratuit = false;
 
   List<Etudiant> _allStudents = [];
   List<Etudiant> _filteredStudents = [];
@@ -59,6 +60,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
     setState(() {
       _studentNameController.text = etudiant.nom;
       _studentLyceeController.text = etudiant.lycee;
+      _isGratuit = etudiant.isGratuit;
       _searchController.clear();
       _showSuggestions = false;
       _filteredStudents = [];
@@ -71,6 +73,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
         id: Uuid().v4(),
         nom: _studentNameController.text,
         lycee: _studentLyceeController.text,
+        isGratuit: _isGratuit,
       );
       Provider.of<GroupeController>(context, listen: false)
           .ajouterEtudiantAuGroupe(widget.groupeId, etudiant);
@@ -244,6 +247,23 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
                           return 'Veuillez entrer un lycée';
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      value: _isGratuit,
+                      onChanged: (value) {
+                        setState(() {
+                          _isGratuit = value ?? false;
+                        });
+                      },
+                      title: const Text('Étudiant gratuit',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                      subtitle: const Text(
+                          'Les séances ne seront pas comptées comme impayées',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: const Color(0xFF2563EB),
                     ),
                   ],
                 ),

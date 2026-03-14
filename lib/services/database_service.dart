@@ -26,7 +26,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'app_database.db');
     return await openDatabase(
       path,
-      version: 4, // Incremented version to add name column
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -34,8 +34,10 @@ class DatabaseService {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 4) {
-      // Add name column to seances table
       await db.execute('ALTER TABLE seances ADD COLUMN name TEXT DEFAULT "Séance"');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE etudiants ADD COLUMN isGratuit INTEGER DEFAULT 0');
     }
   }
 
@@ -60,6 +62,7 @@ class DatabaseService {
         present INTEGER,
         groupeId TEXT,
         unpaidSessions INTEGER DEFAULT 0,
+        isGratuit INTEGER DEFAULT 0,
         FOREIGN KEY(groupeId) REFERENCES groupes(id)
       )
     ''');
@@ -828,29 +831,32 @@ class DatabaseService {
             // Get the student's current unpaid sessions count
             final List<Map<String, dynamic>> studentResult = await txn.query(
               'etudiants',
-              columns: ['unpaidSessions', 'groupeId'],
+              columns: ['unpaidSessions', 'groupeId', 'isGratuit'],
               where: 'id = ?',
               whereArgs: [etudiantId],
             );
 
             if (studentResult.isNotEmpty) {
-              final currentUnpaidSessions =
-                  studentResult.first['unpaidSessions'] as int;
-              final groupId = studentResult.first['groupeId'] as String;
+              final isGratuit = studentResult.first['isGratuit'] == 1;
+              if (!isGratuit) {
+                final currentUnpaidSessions =
+                    studentResult.first['unpaidSessions'] as int;
+                final groupId = studentResult.first['groupeId'] as String;
 
-              // Update the student's unpaid sessions
-              await txn.update(
-                'etudiants',
-                {
-                  'unpaidSessions':
-                      currentUnpaidSessions > 0 ? currentUnpaidSessions - 1 : 0,
-                  'groupeId': groupId // Preserve the original group ID
-                },
-                where: 'id = ?',
-                whereArgs: [etudiantId],
-              );
+                // Update the student's unpaid sessions
+                await txn.update(
+                  'etudiants',
+                  {
+                    'unpaidSessions':
+                        currentUnpaidSessions > 0 ? currentUnpaidSessions - 1 : 0,
+                    'groupeId': groupId // Preserve the original group ID
+                  },
+                  where: 'id = ?',
+                  whereArgs: [etudiantId],
+                );
 
-              print('Debug: Updated unpaid sessions for student $etudiantId');
+                print('Debug: Updated unpaid sessions for student $etudiantId');
+              }
             }
           }
         });
@@ -1055,5 +1061,23 @@ class DatabaseService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Dashboard: total unpaid sessions for non-gratuit students
+  Future<int> getTotalUnpaidSessions() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COALESCE(SUM(unpaidSessions), 0) as total FROM etudiants WHERE isGratuit = 0',
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// Dashboard: total paid sessions from payments table
+  Future<int> getTotalPaidSessions() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COALESCE(SUM(numberOfSessions), 0) as total FROM payments',
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 }

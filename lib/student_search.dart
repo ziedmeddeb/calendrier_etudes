@@ -31,6 +31,394 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return _buildBody(context);
+  }
+
+  Future<void> _confirmDeleteStudent(
+      Etudiant etudiant, Groupe groupe, GroupeController groupeController) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirmation'),
+          content: Text('Supprimer ${etudiant.nom} du groupe ${groupe.nom} ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Supprimer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    groupeController.supprimerEtudiantDuGroupe(groupe.id, etudiant.id);
+    setState(() {});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${etudiant.nom} supprimé du groupe')),
+    );
+  }
+
+  Future<void> _showPermutationChoiceDialog(BuildContext context,
+      Etudiant etudiant, Groupe groupe, GroupeController groupeController) async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.swap_horiz, color: Colors.teal, size: 36),
+              const SizedBox(height: 12),
+              Text(
+                'Permuter ${etudiant.nom}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Choisissez le type de permutation',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              _choiceCard(
+                icon: Icons.people_alt_outlined,
+                color: Colors.indigo,
+                title: 'Permuter avec un étudiant',
+                subtitle: 'Échange de place avec un étudiant d\'un autre groupe',
+                onTap: () => Navigator.pop(ctx, 'swap'),
+              ),
+              const SizedBox(height: 10),
+              _choiceCard(
+                icon: Icons.arrow_forward_outlined,
+                color: Colors.teal,
+                title: 'Déplacer vers un groupe',
+                subtitle: 'Transfère l\'étudiant sans échange',
+                onTap: () => Navigator.pop(ctx, 'move'),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annuler'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (choice == 'swap') {
+      await _showSwapWithStudentDialog(context, etudiant, groupe, groupeController);
+    } else if (choice == 'move') {
+      await _showMoveToGroupDialog(context, etudiant, groupe, groupeController);
+    }
+  }
+
+  Widget _choiceCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: color.withOpacity(0.15),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 13, color: color)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: color, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showMoveToGroupDialog(BuildContext context, Etudiant etudiant,
+      Groupe currentGroupe, GroupeController groupeController) async {
+    final otherGroupes = groupeController.groupes
+        .where((g) => g.id != currentGroupe.id)
+        .toList();
+
+    if (otherGroupes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Aucun autre groupe disponible.')));
+      return;
+    }
+
+    Groupe? selectedGroupe;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text('Déplacer ${etudiant.nom}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Groupe de destination :'),
+              const SizedBox(height: 12),
+              DropdownButton<Groupe>(
+                isExpanded: true,
+                value: selectedGroupe,
+                hint: const Text('Sélectionner un groupe'),
+                items: otherGroupes
+                    .map((g) => DropdownMenuItem(
+                          value: g,
+                          child: Text('${g.nom} (${g.jour})'),
+                        ))
+                    .toList(),
+                onChanged: (g) => setD(() => selectedGroupe = g),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: selectedGroupe == null
+                  ? null
+                  : () async {
+                      Navigator.pop(ctx);
+                      try {
+                        await groupeController.transfererEtudiant(
+                          etudiant.id,
+                          currentGroupe.id,
+                          selectedGroupe!.id,
+                        );
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(
+                              '${etudiant.nom} déplacé vers ${selectedGroupe!.nom}'),
+                          backgroundColor: Colors.teal,
+                        ));
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('Erreur: $e'),
+                            backgroundColor: Colors.red));
+                      }
+                    },
+              child: const Text('Déplacer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSwapWithStudentDialog(BuildContext context,
+      Etudiant etudiant, Groupe currentGroupe, GroupeController groupeController) async {
+    final otherGroupes = groupeController.groupes
+        .where((g) => g.id != currentGroupe.id)
+        .toList();
+
+    if (otherGroupes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Aucun autre groupe disponible.')));
+      return;
+    }
+
+    Groupe? selectedGroupe;
+    Etudiant? selectedTarget;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final targetStudents = selectedGroupe?.etudiants ?? [];
+          return AlertDialog(
+            title: const Text('Permuter avec un étudiant'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person, color: Colors.indigo, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(etudiant.nom,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, color: Colors.indigo)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Center(child: Icon(Icons.swap_vert, color: Colors.grey, size: 20)),
+                  const SizedBox(height: 4),
+                  const Text('Groupe :',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  DropdownButton<Groupe>(
+                    isExpanded: true,
+                    value: selectedGroupe,
+                    hint: const Text('Sélectionner un groupe'),
+                    items: otherGroupes
+                        .map((g) => DropdownMenuItem(
+                              value: g,
+                              child: Text('${g.nom} (${g.jour})'),
+                            ))
+                        .toList(),
+                    onChanged: (g) => setD(() {
+                      selectedGroupe = g;
+                      selectedTarget = null;
+                    }),
+                  ),
+                  if (selectedGroupe != null) ...[
+                    const SizedBox(height: 12),
+                    const Text('Étudiant à échanger :',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    if (targetStudents.isEmpty)
+                      Text('Ce groupe n\'a aucun étudiant.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500))
+                    else
+                      SizedBox(
+                        height: targetStudents.length > 4
+                            ? 220
+                            : targetStudents.length * 56.0,
+                        child: SingleChildScrollView(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: List.generate(
+                                targetStudents.length,
+                                (i) {
+                                  final s = targetStudents[i];
+                                  final isSelected = selectedTarget?.id == s.id;
+                                  return Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (i > 0) const Divider(height: 1),
+                                      ListTile(
+                                        dense: true,
+                                        selected: isSelected,
+                                        selectedTileColor: Colors.indigo.shade50,
+                                        leading: CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor: Colors.indigo.withOpacity(0.12),
+                                          child: Text(
+                                            s.nom.isNotEmpty ? s.nom[0].toUpperCase() : '?',
+                                            style: const TextStyle(
+                                                color: Colors.indigo,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12),
+                                          ),
+                                        ),
+                                        title: Text(s.nom, style: const TextStyle(fontSize: 13)),
+                                        subtitle: Text(s.lycee, style: const TextStyle(fontSize: 11)),
+                                        trailing: isSelected
+                                            ? const Icon(Icons.check_circle,
+                                                color: Colors.indigo, size: 18)
+                                            : null,
+                                        onTap: () => setD(() => selectedTarget = s),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Annuler')),
+              ElevatedButton(
+                onPressed: (selectedGroupe == null || selectedTarget == null)
+                    ? null
+                    : () async {
+                        Navigator.pop(ctx);
+                        try {
+                          await groupeController.permuterEtudiants(
+                            etudiant.id,
+                            currentGroupe.id,
+                            selectedTarget!.id,
+                            selectedGroupe!.id,
+                          );
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  '${etudiant.nom} ↔ ${selectedTarget!.nom} permutés avec succès'),
+                              backgroundColor: Colors.indigo,
+                            ),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text('Erreur: $e'),
+                              backgroundColor: Colors.red));
+                        }
+                      },
+                child: const Text('Permuter'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     final groupeController = Provider.of<GroupeController>(context);
 
     List<Etudiant> allStudents = [];
@@ -123,7 +511,7 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                         orElse: () =>
                             throw Exception('Student not found in any group'),
                       );
-                      return _buildStudentCard(context, student, groupe);
+                      return _buildStudentCard(context, student, groupe, groupeController);
                     },
                   ),
           ),
@@ -133,7 +521,7 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
   }
 
   Widget _buildStudentCard(
-      BuildContext context, Etudiant student, Groupe groupe) {
+      BuildContext context, Etudiant student, Groupe groupe, GroupeController groupeController) {
     final color = _avatarColor(student.nom);
     final initials = student.nom.isNotEmpty
         ? student.nom
@@ -218,6 +606,10 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                     ),
                   );
                 }),
+                _iconBtn(Icons.swap_horiz_outlined, Colors.teal, () async {
+                  await _showPermutationChoiceDialog(
+                      context, student, groupe, groupeController);
+                }),
                 _iconBtn(Icons.edit_outlined, Colors.grey.shade600, () async {
                   await Navigator.push(
                     context,
@@ -228,6 +620,9 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                       ),
                     ),
                   );
+                }),
+                _iconBtn(Icons.delete_outline, Colors.red.shade400, () {
+                  _confirmDeleteStudent(student, groupe, groupeController);
                 }),
               ],
             ),

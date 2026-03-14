@@ -125,7 +125,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         if (originalPresent == null || originalPresent != seance.present) {
           Etudiant? etudiant =
               await _databaseService.getEtudiantById(seance.etudiantId);
-          if (etudiant != null) {
+          if (etudiant != null && !etudiant.isGratuit) {
             int unpaidSessions = etudiant.unpaidSessions;
             if (seance.present) {
               // Only increment if it's a new present record

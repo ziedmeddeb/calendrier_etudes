@@ -6,6 +6,7 @@ import 'controllers/groupe_controller.dart';
 import 'calendar_screen.dart';
 import 'group_management_screen.dart';
 import 'data_screen.dart';
+import 'dashboard_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -168,6 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static List<Widget> _widgetOptions = <Widget>[
     CalendarScreen(),
     GroupManagementScreen(),
+    DashboardScreen(),
     DataScreen(),
   ];
 
@@ -202,6 +204,11 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icon(Icons.group_outlined),
               activeIcon: Icon(Icons.group),
               label: 'Groupes',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined),
+              activeIcon: Icon(Icons.dashboard),
+              label: 'Dashboard',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.cloud_sync_outlined),
