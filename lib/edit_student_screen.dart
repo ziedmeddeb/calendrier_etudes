@@ -6,7 +6,6 @@ import 'models/etudiant.dart';
 class EditStudentScreen extends StatefulWidget {
   final String groupeId;
   final Etudiant etudiant;
-
   EditStudentScreen({required this.groupeId, required this.etudiant});
 
   @override
@@ -22,8 +21,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
   void initState() {
     super.initState();
     _studentNameController = TextEditingController(text: widget.etudiant.nom);
-    _studentLyceeController =
-        TextEditingController(text: widget.etudiant.lycee);
+    _studentLyceeController = TextEditingController(text: widget.etudiant.lycee);
   }
 
   void _submitForm() {
@@ -43,36 +41,66 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Modifier Étudiant')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(title: const Text('Modifier Étudiant')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextFormField(
-                controller: _studentNameController,
-                decoration: InputDecoration(labelText: 'Nom de l\'Étudiant'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un nom';
-                  }
-                  return null;
-                },
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Informations de l\'étudiant',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _studentNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nom complet',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Veuillez entrer un nom';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _studentLyceeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Lycée / Établissement',
+                        prefixIcon: Icon(Icons.school_outlined),
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Veuillez entrer un lycée';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
               ),
-              TextFormField(
-                controller: _studentLyceeController,
-                decoration: InputDecoration(labelText: 'Lycée de l\'Étudiant'),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez entrer un lycée';
-                  }
-                  return null;
-                },
-              ),
-              ElevatedButton(
-                onPressed: _submitForm,
-                child: Text('Modifier Étudiant'),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _submitForm,
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: const Text('Enregistrer les modifications'),
+                ),
               ),
             ],
           ),

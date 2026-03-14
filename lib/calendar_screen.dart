@@ -146,20 +146,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Nom de la séance'),
+          title: const Row(children: [
+            Icon(Icons.label_outline, size: 20, color: Color(0xFF2563EB)),
+            SizedBox(width: 8),
+            Text('Nom de la séance'),
+          ]),
           content: TextField(
             controller: nameController,
-            decoration: InputDecoration(
-              hintText: 'Entrez le nom de la séance',
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Ex: Séance de rattrapage',
+              prefixIcon: Icon(Icons.edit_outlined),
             ),
           ),
           actions: [
             TextButton(
-              child: Text('Annuler'),
+              child: const Text('Annuler'),
               onPressed: () => Navigator.of(context).pop(),
             ),
-            TextButton(
-              child: Text('Confirmer'),
+            ElevatedButton(
+              child: const Text('Confirmer'),
               onPressed: () => Navigator.of(context).pop(nameController.text),
             ),
           ],
@@ -174,7 +180,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Sélectionner un groupe'),
+          title: const Row(children: [
+            Icon(Icons.group_outlined, size: 20, color: Color(0xFF2563EB)),
+            SizedBox(width: 8),
+            Text('Sélectionner un groupe'),
+          ]),
           content: Container(
             width: double.maxFinite,
             child: ListView.builder(
@@ -183,7 +193,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
               itemBuilder: (context, index) {
                 final groupe = groupeController.groupes[index];
                 return ListTile(
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: const Color(0xFFEFF6FF),
+                    child: Text(
+                      groupe.nom[0].toUpperCase(),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2563EB)),
+                    ),
+                  ),
                   title: Text(groupe.nom),
+                  subtitle: Text(groupe.jour),
                   onTap: () => Navigator.of(context).pop(groupe),
                 );
               },
@@ -191,7 +213,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
           actions: [
             TextButton(
-              child: Text('Annuler'),
+              child: const Text('Annuler'),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ],
@@ -387,11 +409,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text('Calendrier'),
+        title: const Text('Calendrier'),
         actions: [
           PopupMenuButton<CalendarView>(
-            icon: Icon(Icons.calendar_today),
+            icon: const Icon(Icons.calendar_view_week_outlined),
             tooltip: 'Changer la vue',
             initialValue: _currentView,
             onSelected: (CalendarView newView) {
@@ -401,17 +424,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
               });
             },
             itemBuilder: (BuildContext context) => [
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: CalendarView.day,
-                child: Text('Vue journalière'),
+                child: Row(children: [
+                  Icon(Icons.calendar_view_day_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('Vue journalière'),
+                ]),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: CalendarView.week,
-                child: Text('Vue semaine'),
+                child: Row(children: [
+                  Icon(Icons.calendar_view_week_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('Vue semaine'),
+                ]),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: CalendarView.month,
-                child: Text('Vue mois'),
+                child: Row(children: [
+                  Icon(Icons.calendar_month_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('Vue mois'),
+                ]),
               ),
             ],
           ),
@@ -419,19 +454,62 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addCustomSession(context),
-        child: Icon(Icons.add),
+        child: const Icon(Icons.add),
         tooltip: 'Ajouter une séance personnalisée',
       ),
       body: Consumer<GroupeController>(
         builder: (context, groupeController, child) {
           if (_isLoading) {
-            return Center(child: CircularProgressIndicator());
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Chargement du calendrier...',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                  ),
+                ],
+              ),
+            );
           }
 
           if (groupeController.groupes.isEmpty) {
             return Center(
-              child:
-                  Text('Veuillez ajouter des groupes pour voir le calendrier'),
+              child: Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(Icons.event_note_outlined,
+                          size: 40, color: Color(0xFF2563EB)),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Aucun groupe',
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1E293B)),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Créez d\'abord un groupe pour voir\nles séances dans le calendrier',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 14, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
             );
           }
 
@@ -439,29 +517,53 @@ class _CalendarScreenState extends State<CalendarScreen> {
             controller: _calendarController,
             view: _currentView,
             dataSource: MeetingDataSource(_appointments),
-            timeSlotViewSettings: TimeSlotViewSettings(
+            timeSlotViewSettings: const TimeSlotViewSettings(
               startHour: 7,
               endHour: 23,
               timeFormat: 'HH:mm',
+              timeTextStyle: TextStyle(
+                fontSize: 11,
+                color: Color(0xFF64748B),
+              ),
             ),
-            viewHeaderStyle: ViewHeaderStyle(
+            viewHeaderStyle: const ViewHeaderStyle(
               dayTextStyle: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: Colors.black,
+                color: Color(0xFF64748B),
+              ),
+              dateTextStyle: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
               ),
             ),
-            monthViewSettings: MonthViewSettings(
+            monthViewSettings: const MonthViewSettings(
               appointmentDisplayMode: MonthAppointmentDisplayMode.appointment,
             ),
+            headerStyle: const CalendarHeaderStyle(
+              textStyle: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E293B),
+              ),
+            ),
             headerDateFormat: 'MMMM yyyy',
-            todayHighlightColor: Colors.blue,
+            todayHighlightColor: const Color(0xFF2563EB),
+            todayTextStyle: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+            selectionDecoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFF2563EB), width: 2),
+              borderRadius: BorderRadius.circular(4),
+            ),
             firstDayOfWeek: 1,
             onTap: (CalendarTapDetails details) async {
-              // Make the callback async
               if (details.appointments != null &&
                   details.appointments!.isNotEmpty) {
-                final appointment = details.appointments!.first as Appointment;
+                final appointment =
+                    details.appointments!.first as Appointment;
                 final groupe = groupeController.groupes
                     .firstWhere((g) => g.id == appointment.notes);
 
@@ -472,7 +574,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   appointment.startTime.hour,
                 );
 
-                // Wait for the AttendanceScreen to pop
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -483,36 +584,45 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 );
 
-                // Reload appointments after returning
                 await _loadAppointments();
               }
             },
             onLongPress: (CalendarLongPressDetails details) async {
               if (details.appointments != null &&
                   details.appointments!.isNotEmpty) {
-                final appointment = details.appointments!.first as Appointment;
+                final appointment =
+                    details.appointments!.first as Appointment;
 
-                // Show options menu
                 await showDialog(
                   context: context,
                   builder: (BuildContext context) {
                     return AlertDialog(
-                      title: Text('Options de la séance'),
+                      title: Row(
+                        children: [
+                          Icon(Icons.more_horiz, color: Colors.grey.shade600),
+                          const SizedBox(width: 8),
+                          const Text('Options de la séance'),
+                        ],
+                      ),
                       content: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (appointment.color == Colors.green)
                             ListTile(
-                              leading: Icon(Icons.delete),
-                              title: Text('Supprimer la séance personnalisée'),
+                              leading: Icon(Icons.delete_outline,
+                                  color: Colors.red.shade400),
+                              title: const Text('Supprimer la séance'),
+                              contentPadding: EdgeInsets.zero,
                               onTap: () async {
                                 Navigator.of(context).pop('delete');
                               },
                             ),
                           if (appointment.color != Colors.green)
                             ListTile(
-                              leading: Icon(Icons.visibility_off),
-                              title: Text('Masquer cette séance'),
+                              leading: Icon(Icons.visibility_off_outlined,
+                                  color: Colors.orange.shade600),
+                              title: const Text('Masquer cette séance'),
+                              contentPadding: EdgeInsets.zero,
                               onTap: () async {
                                 Navigator.of(context).pop('hide');
                               },
@@ -527,17 +637,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       context: context,
                       builder: (BuildContext context) {
                         return AlertDialog(
-                          title: Text('Supprimer la séance personnalisée'),
-                          content: Text(
+                          title: Row(children: [
+                            Icon(Icons.warning_amber_rounded,
+                                color: Colors.red.shade400, size: 22),
+                            const SizedBox(width: 8),
+                            const Text('Supprimer la séance'),
+                          ]),
+                          content: const Text(
                               'Êtes-vous sûr de vouloir supprimer cette séance personnalisée ?'),
                           actions: [
                             TextButton(
-                              child: Text('Annuler'),
-                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Annuler'),
+                              onPressed: () =>
+                                  Navigator.of(context).pop(false),
                             ),
-                            TextButton(
-                              child: Text('Supprimer'),
-                              onPressed: () => Navigator.of(context).pop(true),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white),
+                              child: const Text('Supprimer'),
+                              onPressed: () =>
+                                  Navigator.of(context).pop(true),
                             ),
                           ],
                         );
@@ -554,7 +674,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       await _deleteCustomSession(session);
                     }
                   } else if (result == 'hide') {
-                    // Hide the séance
                     final groupe = groupeController.groupes
                         .firstWhere((g) => g.id == appointment.notes);
                     await DatabaseService()

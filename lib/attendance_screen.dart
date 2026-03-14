@@ -193,25 +193,51 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Ajouter un étudiant externe'),
+          title: const Row(children: [
+            Icon(Icons.person_add_outlined, size: 20, color: Color(0xFF2563EB)),
+            SizedBox(width: 8),
+            Text('Étudiant externe'),
+          ]),
           content: Container(
             width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: filteredStudents.length,
-              itemBuilder: (context, index) {
-                final student = filteredStudents[index];
-                return ListTile(
-                  title: Text(student.nom),
-                  subtitle: Text('Lycée: ${student.lycee}'),
-                  onTap: () => Navigator.of(context).pop(student),
-                );
-              },
-            ),
+            child: filteredStudents.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Aucun étudiant disponible'),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: filteredStudents.length,
+                    itemBuilder: (context, index) {
+                      final student = filteredStudents[index];
+                      final initials = student.nom.isNotEmpty
+                          ? student.nom
+                              .trim()
+                              .split(' ')
+                              .take(2)
+                              .map((w) => w[0].toUpperCase())
+                              .join()
+                          : '?';
+                      return ListTile(
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: const Color(0xFFEFF6FF),
+                          child: Text(initials,
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF2563EB))),
+                        ),
+                        title: Text(student.nom),
+                        subtitle: Text(student.lycee),
+                        onTap: () => Navigator.of(context).pop(student),
+                      );
+                    },
+                  ),
           ),
           actions: [
             TextButton(
-              child: Text('Annuler'),
+              child: const Text('Annuler'),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ],
@@ -249,22 +275,27 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Modifier le nom de la séance'),
+          title: const Row(children: [
+            Icon(Icons.label_outline, size: 20, color: Color(0xFF2563EB)),
+            SizedBox(width: 8),
+            Text('Nom de la séance'),
+          ]),
           content: TextField(
             controller: controller,
-            decoration: InputDecoration(
-              hintText: 'Entrez le nouveau nom',
-            ),
             autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Ex: Séance normale',
+              prefixIcon: Icon(Icons.edit_outlined),
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Annuler'),
+              child: const Text('Annuler'),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () => Navigator.of(context).pop(controller.text),
-              child: Text('Confirmer'),
+              child: const Text('Confirmer'),
             ),
           ],
         );
@@ -302,132 +333,258 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       return Center(child: Text('Aucune donnée disponible'));
     }
 
+    final int presentCount = _seanceMap.values.where((s) => s.present).length;
     final int totalStudents =
         widget.groupe.etudiants.length + _externalStudents.length;
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
+        // Session header
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _sessionName,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).primaryColor,
-                ),
-              ),
-              SizedBox(height: 12),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Date: ${widget.date.day}/${widget.date.month}/${widget.date.year}',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
-                  Text(
-                    'Total étudiants: $totalStudents',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (_externalStudents.isNotEmpty)
-                    Text(
-                      '(${widget.groupe.etudiants.length} réguliers, ${_externalStudents.length} externes)',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  Expanded(
+                    child: Text(
+                      _sessionName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B),
+                      ),
                     ),
-                  ElevatedButton.icon(
-                    icon: Icon(Icons.person_add),
-                    label: Text('Ajouter étudiant'),
-                    onPressed: _addExternalStudent,
                   ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _infoBadge(
+                    Icons.calendar_today_outlined,
+                    '${widget.date.day}/${widget.date.month}/${widget.date.year}',
+                    const Color(0xFF2563EB),
+                  ),
+                  const SizedBox(width: 8),
+                  _infoBadge(
+                    Icons.check_circle_outline,
+                    '$presentCount / $totalStudents présents',
+                    presentCount == totalStudents
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFF59E0B),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_externalStudents.isNotEmpty)
+                    _infoBadge(
+                      Icons.people_outline,
+                      '${_externalStudents.length} externe${_externalStudents.length > 1 ? "s" : ""}',
+                      const Color(0xFF8B5CF6),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.person_add_outlined, size: 16),
+                  label: const Text('Ajouter étudiant externe'),
+                  onPressed: _addExternalStudent,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF2563EB),
+                    side: const BorderSide(color: Color(0xFF2563EB)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
             ],
           ),
         ),
-        Divider(thickness: 1),
+        const Divider(height: 1),
         Expanded(
           child: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
-              ...widget.groupe.etudiants
-                  .sorted(
-                      (a, b) => a.nom.compareTo(b.nom)) // Sort regular students
-                  .map((etudiant) {
-                final seance = _seanceMap[etudiant.id];
-                final isPresent = seance?.present ?? false;
-
-                return ListTile(
-                  title: Text('${etudiant.nom}'),
-                  trailing: IconButton(
-                    icon: Icon(
-                      isPresent
-                          ? Icons.check_box
-                          : Icons.check_box_outline_blank,
-                    ),
-                    onPressed: () => _toggleAttendance(etudiant.id),
-                  ),
-                );
-              }),
-              if (_externalStudents.isNotEmpty)
+              if (widget.groupe.etudiants.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Column(
-                    children: [
-                      Divider(thickness: 2),
-                      Text(
-                        'Étudiants externes',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Text(
+                    'ÉTUDIANTS DU GROUPE',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey.shade500,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ),
-              ..._externalStudents.values
-                  .toList() // Convert to list to enable sorting
-                  .sorted((a, b) =>
-                      a.nom.compareTo(b.nom)) // Sort external students
+              ...widget.groupe.etudiants
+                  .sorted((a, b) => a.nom.compareTo(b.nom))
                   .map((etudiant) {
                 final seance = _seanceMap[etudiant.id];
                 final isPresent = seance?.present ?? false;
-
-                return ListTile(
-                  title: Text('${etudiant.nom}'),
-                  subtitle: Text('(Externe)'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          isPresent
-                              ? Icons.check_box
-                              : Icons.check_box_outline_blank,
-                        ),
-                        onPressed: () => _toggleAttendance(etudiant.id),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.remove_circle_outline,
-                            color: Colors.red),
-                        onPressed: () => _removeExternalStudent(etudiant.id),
-                      ),
-                    ],
-                  ),
+                return _buildStudentTile(
+                  etudiant.nom,
+                  isPresent,
+                  () => _toggleAttendance(etudiant.id),
                 );
               }),
+              if (_externalStudents.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Text(
+                    'ÉTUDIANTS EXTERNES',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.purple.shade400,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                ..._externalStudents.values
+                    .toList()
+                    .sorted((a, b) => a.nom.compareTo(b.nom))
+                    .map((etudiant) {
+                  final seance = _seanceMap[etudiant.id];
+                  final isPresent = seance?.present ?? false;
+                  return _buildStudentTile(
+                    etudiant.nom,
+                    isPresent,
+                    () => _toggleAttendance(etudiant.id),
+                    isExternal: true,
+                    onRemove: () => _removeExternalStudent(etudiant.id),
+                  );
+                }),
+              ],
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _infoBadge(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w600, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudentTile(
+    String name,
+    bool isPresent,
+    VoidCallback onToggle, {
+    bool isExternal = false,
+    VoidCallback? onRemove,
+  }) {
+    final initials = name.isNotEmpty
+        ? name.trim().split(' ').take(2).map((w) => w[0].toUpperCase()).join()
+        : '?';
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      elevation: isPresent ? 1 : 0,
+      color: isPresent ? const Color(0xFFF0FDF4) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: isPresent
+              ? const Color(0xFF10B981).withOpacity(0.4)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: isPresent
+                  ? const Color(0xFF10B981).withOpacity(0.15)
+                  : Colors.grey.shade100,
+              child: Text(
+                initials,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: isPresent
+                      ? const Color(0xFF10B981)
+                      : Colors.grey.shade500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isPresent
+                          ? const Color(0xFF065F46)
+                          : const Color(0xFF1E293B),
+                    ),
+                  ),
+                  if (isExternal)
+                    Text('Externe',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.purple.shade400)),
+                ],
+              ),
+            ),
+            if (onRemove != null)
+              IconButton(
+                icon: Icon(Icons.remove_circle_outline,
+                    color: Colors.red.shade400, size: 18),
+                onPressed: onRemove,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: onToggle,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isPresent
+                      ? const Color(0xFF10B981)
+                      : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  isPresent ? Icons.check : Icons.close,
+                  color: isPresent ? Colors.white : Colors.grey.shade400,
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -500,17 +657,22 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text('Présence - ${widget.groupe.nom}'),
+        title: Text(widget.groupe.nom),
         actions: [
           IconButton(
-            icon: Icon(Icons.edit),
+            icon: const Icon(Icons.edit_outlined),
             onPressed: _editSessionName,
             tooltip: 'Modifier le nom de la séance',
           ),
           if (_hasChanges && !_isLoading)
-            IconButton(
-              icon: Icon(Icons.save),
+            TextButton.icon(
+              icon: const Icon(Icons.save_outlined,
+                  size: 18, color: Colors.white),
+              label: const Text('Sauvegarder',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600)),
               onPressed: _saveChanges,
             ),
         ],
@@ -521,9 +683,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Chargement des présences...'),
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Chargement des présences...',
+                      style: TextStyle(
+                          color: Colors.grey.shade600, fontSize: 14),
+                    ),
                   ],
                 ),
               )

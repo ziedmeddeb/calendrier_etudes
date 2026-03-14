@@ -35,27 +35,28 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
         .then((etudiant) => etudiant!);
   }
 
-  // Function to show confirmation dialog
   Future<void> _showConfirmationDialog(Etudiant etudiant) async {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Confirmer le paiement'),
-          content: Text('Êtes-vous sûr de vouloir payer pour 4 séances?'),
+          title: Row(children: [
+            Icon(Icons.payments_outlined, color: const Color(0xFF2563EB), size: 22),
+            const SizedBox(width: 8),
+            const Text('Confirmer le paiement'),
+          ]),
+          content: const Text('Enregistrer le paiement pour 4 séances ?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-              },
-              child: Text('Annuler'),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-                _payForSessions(etudiant); // Proceed with payments
+                Navigator.of(context).pop();
+                _payForSessions(etudiant);
               },
-              child: Text('Confirmer'),
+              child: const Text('Confirmer'),
             ),
           ],
         );
@@ -64,35 +65,26 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
   }
 
   Future<void> _payForSessions(Etudiant etudiant) async {
-    if (etudiant.unpaidSessions != null) {
-      // Create and save the payment record
-      final payment = Payment(
-        etudiantId: etudiant.id,
-        numberOfSessions: 4,
-        date: DateTime.now(),
-      );
-      await DatabaseService().insertPayment(payment);
+    final payment = Payment(
+      etudiantId: etudiant.id,
+      numberOfSessions: 4,
+      date: DateTime.now(),
+    );
+    await DatabaseService().insertPayment(payment);
 
-      // Update unpaid sessions
-      etudiant.unpaidSessions = etudiant.unpaidSessions! - 4;
+    etudiant.unpaidSessions = etudiant.unpaidSessions - 4;
+    await DatabaseService().updateEtudiant(etudiant, widget.group.id);
 
-      // Update the Etudiant in the database
-      await DatabaseService().updateEtudiant(etudiant, widget.group.id);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Paiement effectué pour 4 séances'),
+    ));
 
-      // Show a snack bar
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Paiement effectué pour 4 séances'),
-      ));
+    final Etudiant? updatedEtudiant =
+        await DatabaseService().getEtudiantById(etudiant.id);
 
-      // Reload the updated Etudiant data
-      Etudiant? updatedEtudiant =
-          await DatabaseService().getEtudiantById(etudiant.id);
-
-      // Update the state with the latest Etudiant data
-      setState(() {
-        etudiantFuture = Future.value(updatedEtudiant!);
-      });
-    }
+    setState(() {
+      etudiantFuture = Future.value(updatedEtudiant!);
+    });
   }
 
   String _formatDate(DateTime date) {
@@ -133,15 +125,21 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Confirmer la suppression'),
-          content: const Text('Voulez-vous vraiment supprimer cette séance ? '),
+          title: Row(children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 22),
+            const SizedBox(width: 8),
+            const Text('Supprimer la séance'),
+          ]),
+          content: const Text('Voulez-vous vraiment supprimer cette séance ?'),
           actions: <Widget>[
             TextButton(
-              child: const Text('Non'),
+              child: const Text('Annuler'),
               onPressed: () => Navigator.of(context).pop(),
             ),
-            TextButton(
-              child: const Text('Oui'),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red, foregroundColor: Colors.white),
+              child: const Text('Supprimer'),
               onPressed: () async {
                 Navigator.of(context).pop();
                 await _deleteSeance(etudiantId, date);
@@ -187,66 +185,100 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text('Ajouter un paiement'),
+              title: const Row(children: [
+                Icon(Icons.add_card_outlined, size: 20, color: Color(0xFF2563EB)),
+                SizedBox(width: 8),
+                Text('Ajouter un paiement'),
+              ]),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Séances non payées: ${student.unpaidSessions}',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 14, color: Color(0xFF2563EB)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Séances non payées: ${student.unpaidSessions}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF2563EB)),
+                        ),
+                      ],
+                    ),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   TextField(
                     controller: _sessionsController,
                     keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Nombre de séances',
-                      hintText: 'Entrez le nombre de séances',
+                      hintText: 'Ex: 4',
+                      prefixIcon: Icon(Icons.format_list_numbered_outlined),
                     ),
                   ),
-                  SizedBox(height: 16),
-                  ListTile(
-                    title: Text(
-                        'Date: ${DateFormat('dd/MM/yyyy HH:mm').format(_selectedDate)}'),
-                    trailing: Icon(Icons.calendar_today),
+                  const SizedBox(height: 12),
+                  InkWell(
                     onTap: () async {
                       await _selectDate(context);
                       setState(() {});
                     },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.calendar_today_outlined, size: 16, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 8),
+                          Text(
+                            DateFormat('dd/MM/yyyy HH:mm').format(_selectedDate),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                          const Spacer(),
+                          Icon(Icons.edit_outlined, size: 14, color: Colors.grey.shade500),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
               actions: <Widget>[
                 TextButton(
-                  child: Text('Annuler'),
+                  child: const Text('Annuler'),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
-                TextButton(
-                  child: Text('Ajouter'),
+                ElevatedButton(
+                  child: const Text('Ajouter'),
                   onPressed: () async {
                     if (_sessionsController.text.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Text('Veuillez entrer le nombre de séances'),
                           backgroundColor: Colors.red,
                         ),
                       );
                       return;
                     }
-
-                    final numberOfSessions =
-                        int.tryParse(_sessionsController.text);
+                    final numberOfSessions = int.tryParse(_sessionsController.text);
                     if (numberOfSessions == null || numberOfSessions <= 0) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Text('Nombre de séances invalide'),
                           backgroundColor: Colors.red,
                         ),
                       );
                       return;
                     }
-
                     try {
                       await DatabaseService().insertPayment(
                         Payment(
@@ -256,12 +288,10 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                           date: _selectedDate,
                         ),
                       );
-
                       Navigator.of(context).pop();
                       setState(() => _refreshPayments());
-
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Text('Paiement ajouté avec succès'),
                           backgroundColor: Colors.green,
                         ),
@@ -269,8 +299,7 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content:
-                              Text('Erreur lors de l\'ajout du paiement: $e'),
+                          content: Text('Erreur: $e'),
                           backgroundColor: Colors.red,
                         ),
                       );
@@ -288,14 +317,15 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
-          'Historique: ${widget.etudiant.nom} ',
-          style: TextStyle(fontSize: 17),
+          widget.etudiant.nom,
+          style: const TextStyle(fontSize: 17),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
             onPressed: () => setState(() => _refreshPayments()),
           ),
         ],
@@ -304,123 +334,289 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
         future: etudiantFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text('Erreur: ${snapshot.error}'));
           } else if (!snapshot.hasData) {
-            return Center(child: Text('Étudiant non trouvé.'));
-          } else {
-            final etudiant = snapshot.data!;
+            return const Center(child: Text('Étudiant non trouvé.'));
+          }
 
-            return Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    'Séances non payées: ${etudiant.unpaidSessions ?? 0}',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          final etudiant = snapshot.data!;
+          final unpaid = etudiant.unpaidSessions;
+
+          return Column(
+            children: [
+              // Header card
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(16),
+                child: Column(
                   children: [
-                    ElevatedButton(
-                      onPressed: () => _showConfirmationDialog(etudiant),
-                      child: Text('Payer 4 Séances'),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: unpaid >= 4
+                                ? Colors.red.shade50
+                                : unpaid > 0
+                                    ? Colors.amber.shade50
+                                    : Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: unpaid >= 4
+                                ? Colors.red.shade600
+                                : unpaid > 0
+                                    ? Colors.amber.shade700
+                                    : Colors.green.shade600,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                unpaid > 0
+                                    ? '$unpaid séance${unpaid > 1 ? "s" : ""} non payée${unpaid > 1 ? "s" : ""}'
+                                    : 'À jour ✓',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: unpaid >= 4
+                                      ? Colors.red.shade700
+                                      : unpaid > 0
+                                          ? Colors.amber.shade800
+                                          : Colors.green.shade700,
+                                ),
+                              ),
+                              Text(
+                                'Solde impayé',
+                                style: TextStyle(
+                                    fontSize: 13, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    ElevatedButton(
-                      onPressed: () => _showAddPaymentDialog(),
-                      child: Text('Payer'),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () =>
+                                _showConfirmationDialog(etudiant),
+                            icon: const Icon(Icons.payments_outlined, size: 16),
+                            label: const Text('Payer 4 séances'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              textStyle: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _showAddPaymentDialog(),
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Paiement libre'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              textStyle: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PaymentHistoryScreen(
+                                etudiant: etudiant,
+                                group: widget.group,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                        label: const Text('Voir historique des paiements'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF2563EB),
+                          side: const BorderSide(color: Color(0xFF2563EB)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          textStyle: const TextStyle(fontSize: 13),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PaymentHistoryScreen(
-                          etudiant: etudiant,
-                          group: widget.group,
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: FutureBuilder<List<Seance>>(
+                  future:
+                      DatabaseService().getSeancesByEtudiantId(etudiant.id),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(child: Text('Erreur: ${snapshot.error}'));
+                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.event_note_outlined,
+                                size: 48, color: Colors.grey.shade300),
+                            const SizedBox(height: 12),
+                            Text('Aucune séance',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey.shade500,
+                                    fontWeight: FontWeight.w500)),
+                          ],
                         ),
-                      ),
+                      );
+                    }
+
+                    final seances = snapshot.data!;
+                    return Column(
+                      children: [
+                        Container(
+                          color: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          child: Row(
+                            children: [
+                              Text(
+                                'HISTORIQUE DES SÉANCES',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey.shade500,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${seances.length} séances',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF2563EB),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            itemCount: seances.length,
+                            itemBuilder: (context, index) {
+                              final seance = seances[index];
+                              return _buildSeanceTile(seance, etudiant.id);
+                            },
+                          ),
+                        ),
+                      ],
                     );
                   },
-                  child: Text('Voir Historique Paiements'),
                 ),
-                Expanded(
-                  child: FutureBuilder<List<Seance>>(
-                    future:
-                        DatabaseService().getSeancesByEtudiantId(etudiant.id),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return Center(child: Text('Pas de séances.'));
-                      } else {
-                        final seances = snapshot.data!;
-
-                        return Column(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text(
-                                'Nombre total de séances: ${seances.length}',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: ListView.separated(
-                                itemCount: seances.length,
-                                separatorBuilder: (context, index) => Divider(
-                                  height: 1,
-                                  color: Colors.grey[300],
-                                ),
-                                itemBuilder: (context, index) {
-                                  final seance = seances[index];
-                                  return ListTile(
-                                    title: Text(
-                                      'Date: ${_formatDate(seance.date)}',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w500),
-                                    ),
-                                    subtitle: Text(
-                                      'Present: ${seance.present ? "Oui" : "Non"}',
-                                      style: TextStyle(
-                                        color: seance.present
-                                            ? Colors.green
-                                            : Colors.red,
-                                      ),
-                                    ),
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.cancel,
-                                          color: Colors.red),
-                                      onPressed: () =>
-                                          _showCancelConfirmationDialog(
-                                        etudiant.id,
-                                        seance.date,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        );
-                      }
-                    },
-                  ),
-                ),
-              ],
-            );
-          }
+              ),
+            ],
+          );
         },
+      ),
+    );
+  }
+
+  Widget _buildSeanceTile(Seance seance, String etudiantId) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      color: seance.present ? const Color(0xFFF0FDF4) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: seance.present
+              ? const Color(0xFF10B981).withValues(alpha: 0.3)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: seance.present
+                    ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                    : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                seance.present ? Icons.check : Icons.close,
+                color: seance.present
+                    ? const Color(0xFF10B981)
+                    : Colors.red.shade400,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _formatDate(seance.date),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  Text(
+                    seance.present ? 'Présent(e)' : 'Absent(e)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: seance.present
+                          ? const Color(0xFF059669)
+                          : Colors.red.shade500,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(Icons.delete_outline, color: Colors.red.shade300, size: 18),
+              onPressed: () =>
+                  _showCancelConfirmationDialog(etudiantId, seance.date),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
       ),
     );
   }

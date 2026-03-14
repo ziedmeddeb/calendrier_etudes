@@ -45,11 +45,13 @@ class StudentsByDayScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text('Étudiants par Jour'),
+        title: const Text('Étudiants par Jour'),
         actions: [
           IconButton(
-            icon: Icon(Icons.download),
+            icon: const Icon(Icons.download_outlined),
+            tooltip: 'Exporter en PDF',
             onPressed: () => _generatePDF(context),
           ),
         ],

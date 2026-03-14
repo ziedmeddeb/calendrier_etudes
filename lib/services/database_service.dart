@@ -26,9 +26,17 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'app_database.db');
     return await openDatabase(
       path,
-      version: 3, // Incremented version
+      version: 4, // Incremented version to add name column
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 4) {
+      // Add name column to seances table
+      await db.execute('ALTER TABLE seances ADD COLUMN name TEXT DEFAULT "Séance"');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -61,7 +69,8 @@ class DatabaseService {
     id TEXT PRIMARY KEY,
     date TEXT NOT NULL,
     etudiantId TEXT NOT NULL,
-    present INTEGER NOT NULL
+    present INTEGER NOT NULL,
+    name TEXT DEFAULT 'Séance'
   )
 ''');
 
@@ -491,30 +500,6 @@ class DatabaseService {
     });
   }
 
-  // Future<String?> findStudentOriginalGroup(String studentId) async {
-  //   final db = await database;
-  //   final List<Map<String, dynamic>> result = await db.query(
-  //     'etudiants',
-  //     columns: ['groupeId'],
-  //     where: 'id = ?',
-  //     whereArgs: [studentId],
-  //   );
-
-  //   if (result.isNotEmpty) {
-  //     return result.first['groupeId'] as String;
-  //   }
-  //   return null;
-  // }
-
-  // Future<void> updateEtudiantUnpaidSessions(Etudiant etudiant) async {
-  //   final db = await database;
-  //   await db.update(
-  //     'etudiants',
-  //     {'unpaidSessions': etudiant.unpaidSessions},
-  //     where: 'id = ?',
-  //     whereArgs: [etudiant.id],
-  //   );
-  // }
 
   Future<Seance?> getSeanceForStudentOnDate(
       String studentId, DateTime date) async {
@@ -912,6 +897,40 @@ class DatabaseService {
       return customSessions.first['name'] as String?;
     }
     return null;
+  }
+
+  /// Swaps two students between groups atomically, preserving all history.
+  Future<void> swapEtudiants(String etudiantAId, String groupeAId,
+      String etudiantBId, String groupeBId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Move A → B's group
+      await txn.update(
+        'etudiants',
+        {'groupeId': groupeBId},
+        where: 'id = ? AND groupeId = ?',
+        whereArgs: [etudiantAId, groupeAId],
+      );
+      // Move B → A's group
+      await txn.update(
+        'etudiants',
+        {'groupeId': groupeAId},
+        where: 'id = ? AND groupeId = ?',
+        whereArgs: [etudiantBId, groupeBId],
+      );
+    });
+  }
+
+  /// Transfers a student from one group to another, preserving all history.
+  Future<void> transferEtudiantToGroupe(
+      String etudiantId, String fromGroupeId, String toGroupeId) async {
+    final db = await database;
+    await db.update(
+      'etudiants',
+      {'groupeId': toGroupeId},
+      where: 'id = ? AND groupeId = ?',
+      whereArgs: [etudiantId, fromGroupeId],
+    );
   }
 
   Future<void> updateCustomSessionName(

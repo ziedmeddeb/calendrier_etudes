@@ -13,15 +13,15 @@ dependencies:
   flutter:
     sdk: flutter
   provider: ^6.0.0
-  syncfusion_flutter_calendar: ^20.2.41
-  sqflite: ^2.0.0+4
+  syncfusion_flutter_calendar: 31.1.19
+  sqflite: ^2.4.2
   path: ^1.8.0
   uuid: ^3.0.7
-  sqflite_common_ffi: ^2.0.0+1
+  sqflite_common_ffi: ^2.3.6
   pdf: ^3.6.0
-  path_provider: ^2.0.11
-  intl: 0.19.0
-  permission_handler: ^11.0.0
+  path_provider: ^2.1.4
+  intl: ^0.20.2
+  permission_handler: ^11.3.1
  
   flutter_localizations:
     sdk: flutter

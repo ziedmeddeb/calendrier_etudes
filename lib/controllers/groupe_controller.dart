@@ -75,4 +75,47 @@ class GroupeController with ChangeNotifier {
     _groupes.removeWhere((groupe) => groupe.id == groupeId);
     notifyListeners();
   }
+
+  /// Transfère un étudiant d'un groupe à un autre en préservant tout l'historique.
+  Future<void> transfererEtudiant(
+      String etudiantId, String fromGroupeId, String toGroupeId) async {
+    await _databaseService.transferEtudiantToGroupe(
+        etudiantId, fromGroupeId, toGroupeId);
+
+    final fromGroupe = _groupes.firstWhere((g) => g.id == fromGroupeId,
+        orElse: () => throw StateError('Groupe source introuvable'));
+    final toGroupe = _groupes.firstWhere((g) => g.id == toGroupeId,
+        orElse: () => throw StateError('Groupe destination introuvable'));
+
+    final etudiantIndex =
+        fromGroupe.etudiants.indexWhere((e) => e.id == etudiantId);
+    if (etudiantIndex != -1) {
+      final etudiant = fromGroupe.etudiants.removeAt(etudiantIndex);
+      toGroupe.etudiants.add(etudiant);
+    }
+    notifyListeners();
+  }
+
+  /// Permute deux étudiants entre leurs groupes respectifs (échange de place).
+  Future<void> permuterEtudiants(String etudiantAId, String groupeAId,
+      String etudiantBId, String groupeBId) async {
+    await _databaseService.swapEtudiants(
+        etudiantAId, groupeAId, etudiantBId, groupeBId);
+
+    final groupeA = _groupes.firstWhere((g) => g.id == groupeAId,
+        orElse: () => throw StateError('Groupe A introuvable'));
+    final groupeB = _groupes.firstWhere((g) => g.id == groupeBId,
+        orElse: () => throw StateError('Groupe B introuvable'));
+
+    final indexA = groupeA.etudiants.indexWhere((e) => e.id == etudiantAId);
+    final indexB = groupeB.etudiants.indexWhere((e) => e.id == etudiantBId);
+
+    if (indexA != -1 && indexB != -1) {
+      final etudiantA = groupeA.etudiants.removeAt(indexA);
+      final etudiantB = groupeB.etudiants.removeAt(indexB);
+      groupeA.etudiants.add(etudiantB);
+      groupeB.etudiants.add(etudiantA);
+    }
+    notifyListeners();
+  }
 }
