@@ -60,6 +60,58 @@ class _DataScreenState extends State<DataScreen> {
     _showResult(result);
   }
 
+  Future<void> _confirmAndPush() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirmation'),
+          content: const Text('Voulez-vous vraiment envoyer (push) vos donnees ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Confirmer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _pushData();
+    }
+  }
+
+  Future<void> _confirmAndReceive() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirmation'),
+          content: const Text('Voulez-vous vraiment recuperer (receive) les donnees ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Confirmer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      await _receiveData();
+    }
+  }
+
   void _showResult(SyncResult result) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -104,7 +156,7 @@ class _DataScreenState extends State<DataScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: (_isPushing || _isReceiving) ? null : _pushData,
+                onPressed: (_isPushing || _isReceiving) ? null : _confirmAndPush,
                 icon: _isPushing
                     ? const SizedBox(
                         width: 18,
@@ -119,7 +171,7 @@ class _DataScreenState extends State<DataScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: (_isPushing || _isReceiving) ? null : _receiveData,
+                onPressed: (_isPushing || _isReceiving) ? null : _confirmAndReceive,
                 icon: _isReceiving
                     ? const SizedBox(
                         width: 18,

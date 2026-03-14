@@ -66,6 +66,51 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     return colors[name.codeUnitAt(0) % colors.length];
   }
 
+  Future<void> _confirmDeleteStudent(
+      Etudiant etudiant, GroupeController groupeController) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Confirmation'),
+          content: Text('Supprimer ${etudiant.nom} du groupe ?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Supprimer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    // The controller method returns void, so don't await it.
+    groupeController.supprimerEtudiantDuGroupe(
+      widget.groupe.id,
+      etudiant.id,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _etudiantsFuture = _fetchEtudiants(widget.groupe.id);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${etudiant.nom} supprime du groupe')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupeController = Provider.of<GroupeController>(context);
@@ -294,10 +339,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     _etudiantsFuture = _fetchEtudiants(widget.groupe.id);
                   });
                 }),
-                _actionButton(Icons.delete_outline, Colors.red.shade400, () {
-                  groupeController.supprimerEtudiantDuGroupe(
-                      widget.groupe.id, etudiant.id);
-                }),
+                _actionButton(Icons.delete_outline, Colors.red.shade400,
+                    () => _confirmDeleteStudent(etudiant, groupeController)),
               ],
             ),
           ],
@@ -696,14 +739,21 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
-  Widget _actionButton(
-      IconData icon, Color color, VoidCallback onPressed) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.all(6),
-        child: Icon(icon, size: 18, color: color),
+  Widget _actionButton(IconData icon, Color color, VoidCallback onPressed) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onPressed,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
       ),
     );
   }

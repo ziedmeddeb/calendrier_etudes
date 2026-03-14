@@ -182,65 +182,96 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     if (availableStudents == null || !mounted) return;
 
-    // Filter out students already in the group or already added as external
     final filteredStudents = availableStudents
         .where((student) =>
             !widget.groupe.etudiants.any((e) => e.id == student.id) &&
             !_externalStudents.containsKey(student.id))
-        .toList();
+        .toList()
+      ..sort((a, b) => a.nom.toLowerCase().compareTo(b.nom.toLowerCase()));
 
     final Etudiant? selectedStudent = await showDialog<Etudiant>(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Row(children: [
-            Icon(Icons.person_add_outlined, size: 20, color: Color(0xFF2563EB)),
-            SizedBox(width: 8),
-            Text('Étudiant externe'),
-          ]),
-          content: Container(
-            width: double.maxFinite,
-            child: filteredStudents.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('Aucun étudiant disponible'),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: filteredStudents.length,
-                    itemBuilder: (context, index) {
-                      final student = filteredStudents[index];
-                      final initials = student.nom.isNotEmpty
-                          ? student.nom
-                              .trim()
-                              .split(' ')
-                              .take(2)
-                              .map((w) => w[0].toUpperCase())
-                              .join()
-                          : '?';
-                      return ListTile(
-                        leading: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: const Color(0xFFEFF6FF),
-                          child: Text(initials,
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF2563EB))),
+        String query = '';
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final visibleStudents = filteredStudents
+                .where((student) =>
+                    student.nom.toLowerCase().contains(query.toLowerCase()))
+                .toList();
+
+            return AlertDialog(
+              title: const Row(children: [
+                Icon(Icons.person_add_outlined,
+                    size: 20, color: Color(0xFF2563EB)),
+                SizedBox(width: 8),
+                Text('Etudiant externe'),
+              ]),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Rechercher un etudiant',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          query = value.trim();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    if (visibleStudents.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('Aucun etudiant disponible'),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: visibleStudents.length,
+                          itemBuilder: (context, index) {
+                            final student = visibleStudents[index];
+                            final initials = student.nom.isNotEmpty
+                                ? student.nom
+                                    .trim()
+                                    .split(' ')
+                                    .take(2)
+                                    .map((w) => w[0].toUpperCase())
+                                    .join()
+                                : '?';
+                            return ListTile(
+                              leading: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: const Color(0xFFEFF6FF),
+                                child: Text(initials,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF2563EB))),
+                              ),
+                              title: Text(student.nom),
+                              subtitle: Text(student.lycee),
+                              onTap: () => Navigator.of(context).pop(student),
+                            );
+                          },
                         ),
-                        title: Text(student.nom),
-                        subtitle: Text(student.lycee),
-                        onTap: () => Navigator.of(context).pop(student),
-                      );
-                    },
-                  ),
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Annuler'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Annuler'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -252,18 +283,34 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           id: Uuid().v4(),
           date: widget.date,
           etudiantId: selectedStudent.id,
-          present: true, // Set as present by default since they're being added
+          present: true,
+          name: _sessionName,
         );
         _hasChanges = true;
       });
     }
   }
 
-  void _removeExternalStudent(String studentId) async {
-    await _databaseService.removeExternalStudent(studentId);
+  void _setAllAttendance(bool present) {
+    if (_isLoading) return;
+
     setState(() {
-      _externalStudents.remove(studentId);
-      _seanceMap.remove(studentId);
+      final allStudents = [
+        ...widget.groupe.etudiants,
+        ..._externalStudents.values,
+      ];
+
+      for (final etudiant in allStudents) {
+        final existing = _seanceMap[etudiant.id];
+        _seanceMap[etudiant.id] = Seance(
+          id: existing?.id ?? const Uuid().v4(),
+          date: widget.date,
+          etudiantId: etudiant.id,
+          present: present,
+          name: _sessionName,
+        );
+      }
+
       _hasChanges = true;
     });
   }
@@ -464,6 +511,41 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.done_all_outlined, size: 16),
+                label: const Text('Selectionner tous'),
+                onPressed: () => _setAllAttendance(true),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF10B981),
+                  side: const BorderSide(color: Color(0xFF10B981)),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.remove_done_outlined, size: 16),
+                label: const Text('Tout absent'),
+                onPressed: () => _setAllAttendance(false),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFEF4444),
+                  side: const BorderSide(color: Color(0xFFEF4444)),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
       ],
     );
   }
@@ -652,6 +734,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         });
       }
     }
+  }
+
+  void _removeExternalStudent(String studentId) async {
+    await _databaseService.removeExternalStudent(studentId);
+    if (!mounted) return;
+    setState(() {
+      _externalStudents.remove(studentId);
+      _seanceMap.remove(studentId);
+      _hasChanges = true;
+    });
   }
 
   @override
