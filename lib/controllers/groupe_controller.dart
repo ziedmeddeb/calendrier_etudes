@@ -118,4 +118,8 @@ class GroupeController with ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Future<void> rechargerGroupes(BuildContext context) async {
+    await _loadGroupes(context);
+  }
 }

@@ -957,4 +957,103 @@ class DatabaseService {
       );
     }
   }
+
+  Future<Map<String, dynamic>> exportAllTablesForSync() async {
+    final db = await database;
+    final groupes = await db.query('groupes');
+    final etudiants = await db.query('etudiants');
+    final seances = await db.query('seances');
+    final customSeances = await db.query('custom_seances');
+    final payments = await db.query('payments');
+
+    List<Map<String, dynamic>> hiddenSeances = [];
+    try {
+      hiddenSeances = await db.query('hidden_seances');
+    } catch (_) {
+      hiddenSeances = [];
+    }
+
+    return {
+      'groupes': groupes,
+      'etudiants': etudiants,
+      'seances': seances,
+      'custom_seances': customSeances,
+      'payments': payments,
+      'hidden_seances': hiddenSeances,
+    };
+  }
+
+  Future<void> importAllTablesFromSync(Map<String, dynamic> payload) async {
+    final db = await database;
+
+    await db.transaction((txn) async {
+      await txn.delete('seances');
+      await txn.delete('custom_seances');
+      await txn.delete('payments');
+      await txn.delete('etudiants');
+      await txn.delete('groupes');
+
+      try {
+        await txn.delete('hidden_seances');
+      } catch (_) {}
+
+      await _insertRows(txn, 'groupes', payload['groupes']);
+      await _insertRows(txn, 'etudiants', payload['etudiants']);
+      await _insertRows(txn, 'seances', payload['seances']);
+      await _insertRows(txn, 'custom_seances', payload['custom_seances']);
+      await _insertRows(txn, 'payments', payload['payments']);
+
+      try {
+        await _insertRows(txn, 'hidden_seances', payload['hidden_seances']);
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _insertRows(
+      Transaction txn, String tableName, dynamic rawRows) async {
+    if (rawRows is! List) return;
+
+    for (final row in rawRows) {
+      if (row is Map) {
+        await txn.insert(
+          tableName,
+          Map<String, dynamic>.from(row),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    }
+  }
+
+  Future<DateTime> getLatestLocalUpdateTime() async {
+    final data = await exportAllTablesForSync();
+    DateTime latest = DateTime.fromMillisecondsSinceEpoch(0);
+
+    for (final entry in data.entries) {
+      final rows = entry.value;
+      if (rows is! List) continue;
+
+      for (final row in rows) {
+        if (row is! Map) continue;
+
+        final date = _tryParseDate(row['date']) ??
+            _tryParseDate(row['startTime']) ??
+            _tryParseDate(row['endTime']);
+
+        if (date != null && date.isAfter(latest)) {
+          latest = date;
+        }
+      }
+    }
+
+    return latest;
+  }
+
+  DateTime? _tryParseDate(dynamic value) {
+    if (value is! String) return null;
+    try {
+      return DateTime.parse(value);
+    } catch (_) {
+      return null;
+    }
+  }
 }
