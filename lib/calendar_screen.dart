@@ -376,9 +376,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     // Add custom sessions that don't align with regular times
     for (var session in customSessions) {
-      final key =
-          '${session.startTime.year}-${session.startTime.month}-${session.startTime.day}-${session.startTime.hour}';
-      final groupe = groupes.firstWhere((g) => g.id == session.groupeId);
+      final groupe = groupes.cast<Groupe?>().firstWhere(
+          (g) => g!.id == session.groupeId,
+          orElse: () => null);
+      if (groupe == null) continue;
 
       // Check if we've already added this session (in the regular sessions loop)
       bool alreadyAdded = false;

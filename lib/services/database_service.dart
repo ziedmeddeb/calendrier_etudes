@@ -166,6 +166,11 @@ class DatabaseService {
       where: 'groupeId = ?',
       whereArgs: [groupeId],
     );
+    await db.delete(
+      'custom_seances',
+      where: 'groupeId = ?',
+      whereArgs: [groupeId],
+    );
   }
 
   // Future<void> insertSeance(Seance seance) async {
