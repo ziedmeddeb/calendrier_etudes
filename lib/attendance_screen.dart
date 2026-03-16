@@ -504,7 +504,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                     isPresent,
                     () => _toggleAttendance(etudiant.id),
                     isExternal: true,
-                    onRemove: () => _removeExternalStudent(etudiant.id),
+
                   );
                 }),
               ],
@@ -736,15 +736,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
   }
 
-  void _removeExternalStudent(String studentId) async {
-    await _databaseService.removeExternalStudent(studentId);
-    if (!mounted) return;
-    setState(() {
-      _externalStudents.remove(studentId);
-      _seanceMap.remove(studentId);
-      _hasChanges = true;
-    });
-  }
+
 
   @override
   Widget build(BuildContext context) {
