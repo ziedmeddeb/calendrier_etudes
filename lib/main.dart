@@ -2,20 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'controllers/groupe_controller.dart';
+import 'controllers/theme_controller.dart';
 
 import 'calendar_screen.dart';
 import 'group_management_screen.dart';
 import 'data_screen.dart';
 import 'dashboard_screen.dart';
+import 'services/database_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await NotificationService().init();
   runApp(MyApp());
 }
 
@@ -27,6 +31,111 @@ class AppTheme {
   static const Color warningColor = Color(0xFFF59E0B); // Amber
   static const Color surfaceColor = Color(0xFFF8FAFC);
   static const Color cardColor = Colors.white;
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primaryColor,
+        primary: const Color(0xFF60A5FA),
+        secondary: const Color(0xFFA78BFA),
+        tertiary: const Color(0xFF34D399),
+        error: errorColor,
+        surface: const Color(0xFF1E1E2E),
+        brightness: Brightness.dark,
+      ),
+      fontFamily: 'Roboto',
+      scaffoldBackgroundColor: const Color(0xFF121220),
+      appBarTheme: const AppBarTheme(
+        elevation: 0,
+        centerTitle: true,
+        backgroundColor: Color(0xFF1E1E2E),
+        foregroundColor: Colors.white,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        titleTextStyle: TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
+        ),
+        iconTheme: IconThemeData(color: Colors.white),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 2,
+        shadowColor: Colors.black26,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        color: const Color(0xFF2A2A3E),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF60A5FA),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF60A5FA),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: Color(0xFF60A5FA),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: CircleBorder(),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF2A2A3E),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF3A3A4E)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF3A3A4E)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF60A5FA), width: 2),
+        ),
+        labelStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+        hintStyle: const TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+      ),
+      listTileTheme: const ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFF3A3A4E),
+        thickness: 1,
+        space: 0,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 8,
+        backgroundColor: const Color(0xFF2A2A3E),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        selectedItemColor: Color(0xFF60A5FA),
+        unselectedItemColor: Color(0xFF6B7280),
+        backgroundColor: Color(0xFF1E1E2E),
+        elevation: 12,
+        type: BottomNavigationBarType.fixed,
+        selectedLabelStyle: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+        unselectedLabelStyle: TextStyle(fontSize: 12),
+      ),
+    );
+  }
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -138,21 +247,26 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => GroupeController(context)),
+        ChangeNotifierProvider(create: (context) => ThemeController()),
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Gestion Cours Particuliers',
-        theme: AppTheme.lightTheme,
-        localizationsDelegates: [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-        ],
-        supportedLocales: [
-          const Locale('fr'),
-          const Locale('en'),
-        ],
-        locale: const Locale('fr'),
-        home: HomeScreen(),
+      child: Consumer<ThemeController>(
+        builder: (context, themeController, _) => MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Gestion Cours Particuliers',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeController.themeMode,
+          localizationsDelegates: [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: [
+            const Locale('fr'),
+            const Locale('en'),
+          ],
+          locale: const Locale('fr'),
+          home: HomeScreen(),
+        ),
       ),
     );
   }
@@ -165,6 +279,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  int _unpaidAlertCount = 0;
+
+  static const int _unpaidThreshold = 4;
 
   static List<Widget> _widgetOptions = <Widget>[
     CalendarScreen(),
@@ -173,7 +290,24 @@ class _HomeScreenState extends State<HomeScreen> {
     DataScreen(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _refreshUnpaidCount();
+  }
+
+  Future<void> _refreshUnpaidCount() async {
+    final students = await DatabaseService()
+        .getStudentsWithUnpaidAboveThreshold(_unpaidThreshold);
+    if (mounted) {
+      setState(() {
+        _unpaidAlertCount = students.length;
+      });
+    }
+  }
+
   void _onItemTapped(int index) {
+    _refreshUnpaidCount();
     setState(() {
       _selectedIndex = index;
     });
@@ -194,26 +328,38 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         child: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
+          items: <BottomNavigationBarItem>[
+            const BottomNavigationBarItem(
               icon: Icon(Icons.calendar_today_outlined),
               activeIcon: Icon(Icons.calendar_today),
               label: 'Calendrier',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.group_outlined),
-              activeIcon: Icon(Icons.group),
+              icon: Badge(
+                isLabelVisible: _unpaidAlertCount > 0,
+                label: Text('$_unpaidAlertCount',
+                    style: const TextStyle(fontSize: 10)),
+                backgroundColor: Colors.red,
+                child: const Icon(Icons.group_outlined),
+              ),
+              activeIcon: Badge(
+                isLabelVisible: _unpaidAlertCount > 0,
+                label: Text('$_unpaidAlertCount',
+                    style: const TextStyle(fontSize: 10)),
+                backgroundColor: Colors.red,
+                child: const Icon(Icons.group),
+              ),
               label: 'Groupes',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_outlined),
               activeIcon: Icon(Icons.dashboard),
               label: 'Dashboard',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.cloud_sync_outlined),
-              activeIcon: Icon(Icons.cloud_sync),
-              label: 'Data',
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings),
+              label: 'Config',
             ),
           ],
           currentIndex: _selectedIndex,

@@ -61,7 +61,6 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(title: const Text('Modifier Groupe')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -159,7 +158,7 @@ class _EditGroupScreenState extends State<EditGroupScreen> {
   Widget _sectionCard({required List<Widget> children}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(

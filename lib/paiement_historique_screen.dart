@@ -266,7 +266,6 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
     final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text('Paiements — ${widget.etudiant.nom}'),
         actions: [
@@ -324,7 +323,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
             children: [
               // Summary header
               Container(
-                color: Colors.white,
+                color: Theme.of(context).cardTheme.color,
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
                 child: Row(
                   children: [
@@ -394,10 +393,10 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                                 children: [
                                   Text(
                                     '${payment.numberOfSessions} séance${payment.numberOfSessions > 1 ? "s" : ""} payée${payment.numberOfSessions > 1 ? "s" : ""}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1E293B),
+                                      color: Theme.of(context).colorScheme.onSurface,
                                     ),
                                   ),
                                   const SizedBox(height: 2),

@@ -317,7 +317,6 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
           widget.etudiant.nom,
@@ -348,7 +347,7 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
             children: [
               // Header card
               Container(
-                color: Colors.white,
+                color: Theme.of(context).cardTheme.color,
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
@@ -493,7 +492,7 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                     return Column(
                       children: [
                         Container(
-                          color: Colors.white,
+                          color: Theme.of(context).cardTheme.color,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 10),
                           child: Row(
@@ -589,10 +588,10 @@ class _StudentHistoryScreenState extends State<StudentHistoryScreen> {
                 children: [
                   Text(
                     _formatDate(seance.date),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   Text(

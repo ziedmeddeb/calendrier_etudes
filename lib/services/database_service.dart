@@ -1085,4 +1085,27 @@ class DatabaseService {
     );
     return Sqflite.firstIntValue(result) ?? 0;
   }
+
+  /// Returns non-gratuit students with unpaidSessions >= threshold
+  Future<List<Map<String, dynamic>>> getStudentsWithUnpaidAboveThreshold(
+      int threshold) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      '''SELECT e.id, e.nom, e.unpaidSessions, g.nom as groupeNom
+         FROM etudiants e
+         LEFT JOIN groupes g ON e.groupeId = g.id
+         WHERE e.isGratuit = 0 AND e.unpaidSessions >= ?''',
+      [threshold],
+    );
+    return result;
+  }
+
+  /// Returns distinct lycees from students
+  Future<List<String>> getDistinctLycees() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      "SELECT DISTINCT lycee FROM etudiants WHERE lycee IS NOT NULL AND lycee != '' ORDER BY lycee",
+    );
+    return result.map((r) => r['lycee'] as String).toList();
+  }
 }

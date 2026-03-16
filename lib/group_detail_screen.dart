@@ -115,7 +115,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   Widget build(BuildContext context) {
     final groupeController = Provider.of<GroupeController>(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(widget.groupe.nom),
         actions: [
@@ -168,7 +167,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Widget _buildGroupInfoCard(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardTheme.color,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Row(
         children: [
@@ -216,10 +215,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             const SizedBox(height: 2),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1E293B),
+                color: Theme.of(context).colorScheme.onSurface,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -267,10 +266,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 children: [
                   Text(
                     etudiant.nom,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E293B),
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -308,6 +307,24 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                           color: unpaid >= 4
                               ? Colors.red.shade700
                               : Colors.amber.shade800,
+                        ),
+                      ),
+                    ),
+                  ] else if (unpaid < 0) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${unpaid.abs()} séance${unpaid.abs() > 1 ? "s" : ""} payée${unpaid.abs() > 1 ? "s" : ""} d\'avance',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green.shade700,
                         ),
                       ),
                     ),
@@ -789,7 +806,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
   Widget _buildAddStudentButton(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardTheme.color,
       padding: const EdgeInsets.all(16),
       child: SizedBox(
         width: double.infinity,

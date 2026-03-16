@@ -92,7 +92,6 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(title: const Text('Ajouter un Étudiant')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -104,7 +103,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               // ── Recherche d'étudiant existant ──
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardTheme.color,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
@@ -200,7 +199,7 @@ class _AddStudentScreenState extends State<AddStudentScreen> {
               // ── Formulaire nouveau / pré-rempli ──
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardTheme.color,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(

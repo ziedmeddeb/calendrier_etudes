@@ -410,7 +410,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Calendrier'),
         actions: [
@@ -494,12 +493,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           size: 40, color: Color(0xFF2563EB)),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
+                    Text(
                       'Aucun groupe',
                       style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF1E293B)),
+                          color: Theme.of(context).colorScheme.onSurface),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -514,39 +513,49 @@ class _CalendarScreenState extends State<CalendarScreen> {
             );
           }
 
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final calTextColor = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B);
+          final calHeaderColor = isDark ? Colors.white : const Color(0xFF1E293B);
+          final calBg = isDark ? const Color(0xFF1E1E2E) : Colors.white;
+          final calCellBg = isDark ? const Color(0xFF121220) : Colors.white;
+
           return SfCalendar(
             controller: _calendarController,
             view: _currentView,
             dataSource: MeetingDataSource(_appointments),
-            timeSlotViewSettings: const TimeSlotViewSettings(
+            backgroundColor: calCellBg,
+            cellBorderColor: isDark ? const Color(0xFF2A2A3E) : null,
+            timeSlotViewSettings: TimeSlotViewSettings(
               startHour: 7,
               endHour: 23,
               timeFormat: 'HH:mm',
               timeTextStyle: TextStyle(
                 fontSize: 11,
-                color: Color(0xFF64748B),
+                color: calTextColor,
               ),
             ),
-            viewHeaderStyle: const ViewHeaderStyle(
+            viewHeaderStyle: ViewHeaderStyle(
+              backgroundColor: calBg,
               dayTextStyle: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF64748B),
+                color: calTextColor,
               ),
               dateTextStyle: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1E293B),
+                color: calHeaderColor,
               ),
             ),
             monthViewSettings: const MonthViewSettings(
               appointmentDisplayMode: MonthAppointmentDisplayMode.appointment,
             ),
-            headerStyle: const CalendarHeaderStyle(
+            headerStyle: CalendarHeaderStyle(
+              backgroundColor: calBg,
               textStyle: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1E293B),
+                color: calHeaderColor,
               ),
             ),
             headerDateFormat: 'MMMM yyyy',

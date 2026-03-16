@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'controllers/groupe_controller.dart';
+import 'controllers/theme_controller.dart';
 import 'services/sync_service.dart';
 
 class DataScreen extends StatefulWidget {
@@ -123,31 +124,91 @@ class _DataScreenState extends State<DataScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeController = Provider.of<ThemeController>(context);
     final String lastSyncText = _lastSyncedAt == null
         ? 'Jamais'
         : DateFormat('dd/MM/yyyy HH:mm').format(_lastSyncedAt!);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Data')),
-      body: Padding(
+      appBar: AppBar(title: const Text('Configuration')),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Theme toggle section
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        themeController.isDark ? Icons.dark_mode : Icons.light_mode,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Mode sombre',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            themeController.isDark ? 'Activé' : 'Désactivé',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: themeController.isDark,
+                      onChanged: (_) => themeController.toggleTheme(),
+                      activeColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Sync section
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Synchronisation multi-appareils',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(_status),
                     const SizedBox(height: 8),
-                    Text('Derniere synchronisation: $lastSyncText'),
+
                   ],
                 ),
               ),

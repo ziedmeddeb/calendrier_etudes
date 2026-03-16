@@ -72,9 +72,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final gains = _totalPaid * _sessionPrice;
     final manques = _totalUnpaid * _sessionPrice;
     final total = gains + manques;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = Theme.of(context).colorScheme.onSurface;
+    final subtextColor = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B);
+    final cardBg = Theme.of(context).cardTheme.color;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Dashboard'),
         actions: [
@@ -101,7 +104,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: _buildStatCard(
                             icon: Icons.warning_amber_rounded,
                             iconColor: const Color(0xFFEF4444),
-                            bgColor: const Color(0xFFFEF2F2),
                             label: 'Séances impayées',
                             value: '$_totalUnpaid',
                           ),
@@ -111,7 +113,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: _buildStatCard(
                             icon: Icons.check_circle_outline,
                             iconColor: const Color(0xFF10B981),
-                            bgColor: const Color(0xFFECFDF5),
                             label: 'Séances payées',
                             value: '$_totalPaid',
                           ),
@@ -123,7 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // Price setter
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardBg,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
@@ -137,17 +138,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
                               Icon(Icons.monetization_on_outlined,
-                                  size: 18, color: Color(0xFF2563EB)),
-                              SizedBox(width: 8),
+                                  size: 18, color: Theme.of(context).colorScheme.primary),
+                              const SizedBox(width: 8),
                               Text(
                                 'Prix de la séance',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1E293B),
+                                  color: textColor,
                                 ),
                               ),
                             ],
@@ -178,8 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(height: 8),
                             Text(
                               'Prix actuel: ${_sessionPrice.toStringAsFixed(0)} DT',
-                              style: const TextStyle(
-                                  fontSize: 12, color: Color(0xFF64748B)),
+                              style: TextStyle(fontSize: 12, color: subtextColor),
                             ),
                           ],
                         ],
@@ -189,19 +189,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                     // Financial summary
                     if (_sessionPrice > 0) ...[
-                      const Text(
+                      Text(
                         'Résumé financier',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF1E293B),
+                          color: textColor,
                         ),
                       ),
                       const SizedBox(height: 12),
                       _buildFinanceCard(
                         icon: Icons.trending_up,
                         iconColor: const Color(0xFF10B981),
-                        bgColor: const Color(0xFFECFDF5),
                         label: 'Gains (séances payées)',
                         value: '${gains.toStringAsFixed(0)} DT',
                         valueColor: const Color(0xFF10B981),
@@ -210,7 +209,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       _buildFinanceCard(
                         icon: Icons.trending_down,
                         iconColor: const Color(0xFFEF4444),
-                        bgColor: const Color(0xFFFEF2F2),
                         label: 'Manques (séances impayées)',
                         value: '${manques.toStringAsFixed(0)} DT',
                         valueColor: const Color(0xFFEF4444),
@@ -218,7 +216,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(height: 10),
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: cardBg,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
@@ -228,7 +226,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ],
                           border: Border.all(
-                            color: const Color(0xFF2563EB).withOpacity(0.3),
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
                           ),
                         ),
                         padding: const EdgeInsets.all(16),
@@ -238,28 +236,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.account_balance_wallet,
-                                  color: Color(0xFF2563EB), size: 22),
+                              child: Icon(Icons.account_balance_wallet,
+                                  color: Theme.of(context).colorScheme.primary, size: 22),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Total',
+                                  Text('Total',
                                       style: TextStyle(
                                           fontSize: 13,
-                                          color: Color(0xFF64748B))),
+                                          color: subtextColor)),
                                   const SizedBox(height: 2),
                                   Text(
                                     '${total.toStringAsFixed(0)} DT',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 22,
                                       fontWeight: FontWeight.w800,
-                                      color: Color(0xFF2563EB),
+                                      color: Theme.of(context).colorScheme.primary,
                                     ),
                                   ),
                                 ],
@@ -279,13 +277,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildStatCard({
     required IconData icon,
     required Color iconColor,
-    required Color bgColor,
     required String label,
     required String value,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -299,30 +296,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
+          Icon(icon, color: iconColor, size: 28),
           const SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF1E293B),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF64748B),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF9CA3AF)
+                  : const Color(0xFF64748B),
             ),
           ),
         ],
@@ -333,14 +324,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildFinanceCard({
     required IconData icon,
     required Color iconColor,
-    required Color bgColor,
     required String label,
     required String value,
     required Color valueColor,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -353,22 +343,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
+          Icon(icon, color: iconColor, size: 28),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Color(0xFF64748B),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF9CA3AF)
+                    : const Color(0xFF64748B),
               ),
             ),
           ),

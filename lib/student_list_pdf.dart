@@ -45,7 +45,6 @@ class StudentsByDayScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Étudiants par Jour'),
         actions: [

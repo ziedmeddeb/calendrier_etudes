@@ -44,7 +44,6 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(title: const Text('Modifier Étudiant')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -55,7 +54,7 @@ class _EditStudentScreenState extends State<EditStudentScreen> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardTheme.color,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
                 ),

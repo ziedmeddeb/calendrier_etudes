@@ -1,5 +1,6 @@
 import 'package:calendrier_etude/edit_student_screen.dart';
 import 'package:calendrier_etude/student_history.dart';
+import 'package:calendrier_etude/services/database_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'controllers/groupe_controller.dart';
@@ -15,6 +16,31 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
   String searchQuery = '';
   List<Etudiant> filteredStudents = [];
   final TextEditingController _searchController = TextEditingController();
+
+  // Filters
+  String? _selectedLycee;
+  String? _selectedJour;
+  bool _onlyUnpaid = false;
+  bool _showFilters = false;
+  List<String> _lycees = [];
+
+  static const List<String> _jours = [
+    'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLycees();
+  }
+
+  Future<void> _loadLycees() async {
+    final lycees =
+        await DatabaseService().getDistinctLycees();
+    if (mounted) {
+      setState(() => _lycees = lycees);
+    }
+  }
 
   Color _avatarColor(String name) {
     final colors = [
@@ -418,27 +444,157 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
     );
   }
 
+  Widget _buildFilterPanel() {
+    final hasActiveFilters =
+        _selectedLycee != null || _selectedJour != null || _onlyUnpaid;
+    return Container(
+      color: Theme.of(context).cardTheme.color ?? Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Jour filter chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _jours.map((jour) {
+                final selected = _selectedJour == jour;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: FilterChip(
+                    label: Text(jour.substring(0, 3),
+                        style: TextStyle(fontSize: 11,
+                            color: selected ? Colors.white : null)),
+                    selected: selected,
+                    selectedColor: const Color(0xFF2563EB),
+                    checkmarkColor: Colors.white,
+                    visualDensity: VisualDensity.compact,
+                    onSelected: (val) => setState(() =>
+                        _selectedJour = val ? jour : null),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              // Lycée dropdown
+              if (_lycees.isNotEmpty)
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedLycee,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Lycée',
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isDense: true,
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(
+                          value: null, child: Text('Tous')),
+                      ..._lycees.map((l) =>
+                          DropdownMenuItem(value: l, child: Text(l,
+                              overflow: TextOverflow.ellipsis))),
+                    ],
+                    onChanged: (val) =>
+                        setState(() => _selectedLycee = val),
+                  ),
+                ),
+              const SizedBox(width: 12),
+              // Unpaid filter
+              FilterChip(
+                avatar: Icon(Icons.warning_amber,
+                    size: 16,
+                    color: _onlyUnpaid ? Colors.white : Colors.red.shade400),
+                label: Text('Impayés ≥4',
+                    style: TextStyle(fontSize: 11,
+                        color: _onlyUnpaid ? Colors.white : null)),
+                selected: _onlyUnpaid,
+                selectedColor: Colors.red.shade400,
+                showCheckmark: false,
+                onSelected: (val) =>
+                    setState(() => _onlyUnpaid = val),
+              ),
+            ],
+          ),
+          if (hasActiveFilters)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: GestureDetector(
+                onTap: () => setState(() {
+                  _selectedLycee = null;
+                  _selectedJour = null;
+                  _onlyUnpaid = false;
+                }),
+                child: Text('✕ Réinitialiser les filtres',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBody(BuildContext context) {
     final groupeController = Provider.of<GroupeController>(context);
 
     List<Etudiant> allStudents = [];
+    Map<String, Groupe> studentGroupMap = {};
     for (Groupe groupe in groupeController.groupes) {
-      allStudents.addAll(groupe.etudiants);
+      for (var student in groupe.etudiants) {
+        allStudents.add(student);
+        studentGroupMap[student.id] = groupe;
+      }
     }
 
+    // Apply text search
     filteredStudents = searchQuery.isEmpty
-        ? allStudents
+        ? List.from(allStudents)
         : allStudents
             .where((student) =>
                 student.nom.toLowerCase().contains(searchQuery.toLowerCase()))
             .toList();
+
+    // Apply lycée filter
+    if (_selectedLycee != null) {
+      filteredStudents = filteredStudents
+          .where((s) => s.lycee == _selectedLycee)
+          .toList();
+    }
+
+    // Apply jour filter
+    if (_selectedJour != null) {
+      filteredStudents = filteredStudents.where((s) {
+        final groupe = studentGroupMap[s.id];
+        return groupe != null && groupe.jour == _selectedJour;
+      }).toList();
+    }
+
+    // Apply unpaid filter (≥4)
+    if (_onlyUnpaid) {
+      filteredStudents = filteredStudents
+          .where((s) => s.unpaidSessions >= 4)
+          .toList();
+    }
+
     filteredStudents
         .sort((a, b) => a.nom.toLowerCase().compareTo(b.nom.toLowerCase()));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text('Rechercher un étudiant'),
+        actions: [
+          IconButton(
+            icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
+            tooltip: 'Filtres',
+            onPressed: () => setState(() => _showFilters = !_showFilters),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -464,6 +620,7 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
               onChanged: (value) => setState(() => searchQuery = value),
             ),
           ),
+          if (_showFilters) _buildFilterPanel(),
           if (filteredStudents.isNotEmpty)
             Container(
               color: Colors.white,
@@ -557,10 +714,10 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                 children: [
                   Text(
                     student.nom,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E293B),
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -588,6 +745,14 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                       bgColor: unpaid >= 4
                           ? Colors.red.shade50
                           : Colors.amber.shade50,
+                    ),
+                  ] else if (unpaid < 0) ...[
+                    const SizedBox(height: 4),
+                    _badge(
+                      Icons.check_circle_outline,
+                      '${unpaid.abs()} payée${unpaid.abs() > 1 ? "s" : ""} d\'avance',
+                      Colors.green.shade700,
+                      bgColor: Colors.green.shade50,
                     ),
                   ],
                 ],

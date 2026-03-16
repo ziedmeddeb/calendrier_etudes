@@ -2,6 +2,7 @@ import 'package:calendrier_etude/models/etudiant.dart';
 import 'package:calendrier_etude/models/groupe.dart';
 import 'package:calendrier_etude/models/seance.dart';
 import 'package:calendrier_etude/services/database_service.dart';
+import 'package:calendrier_etude/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:collection/collection.dart';
@@ -153,6 +154,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       }
 
       if (!mounted) return;
+
+      // Check for unpaid alerts and send push notification
+      final unpaidStudents = await _databaseService
+          .getStudentsWithUnpaidAboveThreshold(4);
+      for (final s in unpaidStudents) {
+        await NotificationService().showUnpaidAlert(
+          studentName: s['nom'] as String,
+          unpaidCount: s['unpaidSessions'] as int,
+        );
+      }
 
       setState(() {
         _isLoading = false;
@@ -388,7 +399,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       children: [
         // Session header
         Container(
-          color: Colors.white,
+          color: Theme.of(context).cardTheme.color,
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,10 +409,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   Expanded(
                     child: Text(
                       _sessionName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF1E293B),
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -626,7 +637,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                       fontWeight: FontWeight.w600,
                       color: isPresent
                           ? const Color(0xFF065F46)
-                          : const Color(0xFF1E293B),
+                          : Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   if (isExternal)
@@ -741,7 +752,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(widget.groupe.nom),
         actions: [
