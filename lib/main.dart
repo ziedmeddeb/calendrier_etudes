@@ -13,6 +13,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'services/notification_service.dart';
+import 'services/auth_service.dart';
+import 'activation_screen.dart';
+import 'locked_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -265,10 +268,65 @@ class MyApp extends StatelessWidget {
             const Locale('en'),
           ],
           locale: const Locale('fr'),
-          home: HomeScreen(),
+          home: const AppGate(),
         ),
       ),
     );
+  }
+}
+
+enum _AppState { loading, notActivated, locked, ready }
+
+class AppGate extends StatefulWidget {
+  const AppGate({super.key});
+
+  @override
+  State<AppGate> createState() => _AppGateState();
+}
+
+class _AppGateState extends State<AppGate> {
+  _AppState _state = _AppState.loading;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkState();
+  }
+
+  Future<void> _checkState() async {
+    setState(() => _state = _AppState.loading);
+    final activated = await AuthService.instance.isActivated();
+    if (!mounted) return;
+    if (!activated) {
+      setState(() => _state = _AppState.notActivated);
+      return;
+    }
+    final binding = await AuthService.instance.verifyBinding();
+    if (!mounted) return;
+    if (binding == 'cloned') {
+      setState(() => _state = _AppState.locked);
+    } else if (binding == null) {
+      setState(() => _state = _AppState.ready);
+    } else {
+      // 'revoked' or 'not_activated': wipe already called if revoked
+      setState(() => _state = _AppState.notActivated);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (_state) {
+      case _AppState.loading:
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      case _AppState.notActivated:
+        return ActivationScreen(onActivated: _checkState);
+      case _AppState.locked:
+        return const LockedScreen();
+      case _AppState.ready:
+        return HomeScreen();
+    }
   }
 }
 

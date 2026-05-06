@@ -2,9 +2,8 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/foundation.dart';
 
+import 'auth_service.dart';
 import 'database_service.dart';
 
 class SyncResult {
@@ -23,23 +22,22 @@ class SyncService {
   SyncService._();
 
   static final SyncService instance = SyncService._();
-  static const String _collection = 'app_sync';
-  static const String _docId = 'shared_state';
+
+  String get _userDocPath =>
+      'users/${AuthService.instance.stableUserId}/sync/state';
 
   final DatabaseService _databaseService = DatabaseService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<SyncResult> pushData() async {
     try {
-      final String deviceId = await _getDeviceId();
       final Map<String, dynamic> localSnapshot =
           await _databaseService.exportAllTablesForSync();
       final String localHash = _computeHash(localSnapshot);
 
-      await _firestore.collection(_collection).doc(_docId).set({
+      await _firestore.doc(_userDocPath).set({
         'version': FieldValue.increment(1),
         'updatedAt': FieldValue.serverTimestamp(),
-        'updatedBy': deviceId,
         'hash': localHash,
         'payload': localSnapshot,
       }, SetOptions(merge: true));
@@ -60,8 +58,7 @@ class SyncService {
 
   Future<SyncResult> receiveData() async {
     try {
-      final docRef = _firestore.collection(_collection).doc(_docId);
-      final remoteDoc = await docRef.get();
+      final remoteDoc = await _firestore.doc(_userDocPath).get();
 
       if (!remoteDoc.exists) {
         return SyncResult(
@@ -104,35 +101,5 @@ class SyncService {
     return sha256.convert(utf8.encode(jsonPayload)).toString();
   }
 
-  Future<String> _getDeviceId() async {
-    try {
-      final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-      if (kIsWeb) {
-        final webInfo = await deviceInfo.webBrowserInfo;
-        return 'web-${webInfo.vendor}-${webInfo.userAgent}'.replaceAll(' ', '_');
-      }
 
-      switch (defaultTargetPlatform) {
-        case TargetPlatform.android:
-          final androidInfo = await deviceInfo.androidInfo;
-          return 'android-${androidInfo.id}';
-        case TargetPlatform.iOS:
-          final iosInfo = await deviceInfo.iosInfo;
-          return 'ios-${iosInfo.identifierForVendor ?? 'unknown'}';
-        case TargetPlatform.windows:
-          final windowsInfo = await deviceInfo.windowsInfo;
-          return 'windows-${windowsInfo.deviceId}';
-        case TargetPlatform.linux:
-          final linuxInfo = await deviceInfo.linuxInfo;
-          return 'linux-${linuxInfo.machineId ?? linuxInfo.name}';
-        case TargetPlatform.macOS:
-          final macInfo = await deviceInfo.macOsInfo;
-          return 'macos-${macInfo.systemGUID ?? macInfo.model}';
-        case TargetPlatform.fuchsia:
-          return 'fuchsia-device';
-      }
-    } catch (_) {
-      return 'unknown-device';
-    }
-  }
 }

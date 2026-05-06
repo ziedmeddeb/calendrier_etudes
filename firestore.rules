@@ -1,0 +1,35 @@
+﻿rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    // Activation keys: anyone can read a key by ID; claiming marks it used.
+    // Only the server (admin SDK) may create or delete keys.
+    match /activation_keys/{key} {
+      allow read: if true;
+      allow update: if request.resource.data.used == true
+                    && resource.data.used == false;
+      allow create, delete: if false;
+    }
+
+    // users/{stableId} — stableId is set by the admin in the activation key.
+    // The binding doc stores ownedBy (Firebase Auth UID of the current device).
+    // Any authenticated user can claim/reset this doc as long as they set
+    // themselves as the new owner — the activation key transaction is the real gate.
+    match /users/{stableId} {
+      allow read: if request.auth != null
+                  && resource.data.ownedBy == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.ownedBy == request.auth.uid;
+      allow update: if request.auth != null
+                    && request.resource.data.ownedBy == request.auth.uid;
+      allow delete: if false;
+
+      // Sync data and any other subcollections — only the current owner may access.
+      match /{document=**} {
+        allow read, write: if request.auth != null
+                           && get(/databases/$(db)/documents/users/$(stableId)).data.ownedBy
+                              == request.auth.uid;
+      }
+    }
+  }
+}
