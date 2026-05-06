@@ -24,7 +24,7 @@ class SyncService {
   static final SyncService instance = SyncService._();
 
   String get _userDocPath =>
-      'users/${AuthService.instance.stableUserId}/sync/state';
+      'users/${AuthService.instance.dataKey}/sync/state';
 
   final DatabaseService _databaseService = DatabaseService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;

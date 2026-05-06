@@ -36,12 +36,7 @@ class _ActivationScreenState extends State<ActivationScreen> {
           _error = 'Clé invalide.';
         });
         break;
-      case ActivationResult.keyAlreadyUsed:
-        setState(() {
-          _loading = false;
-          _error = 'Cette clé a déjà été utilisée.';
-        });
-        break;
+
       case ActivationResult.networkError:
         setState(() {
           _loading = false;

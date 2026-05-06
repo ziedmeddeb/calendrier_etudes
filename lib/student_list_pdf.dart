@@ -7,9 +7,17 @@ import 'package:path_provider/path_provider.dart';
 import 'package:calendrier_etude/models/student_group.dart';
 import 'package:calendrier_etude/services/database_service.dart';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 
-class StudentsByDayScreen extends StatelessWidget {
+enum UnpaidFilter { all, moreThan1, moreThan4 }
+
+class StudentsByDayScreen extends StatefulWidget {
+  const StudentsByDayScreen({Key? key}) : super(key: key);
+
+  @override
+  State<StudentsByDayScreen> createState() => _StudentsByDayScreenState();
+}
+
+class _StudentsByDayScreenState extends State<StudentsByDayScreen> {
   final List<String> daysOfWeek = [
     'Lundi',
     'Mardi',
@@ -20,26 +28,40 @@ class StudentsByDayScreen extends StatelessWidget {
     'Dimanche'
   ];
 
-  String _formatDate(DateTime date) {
-    return DateFormat('dd/MM/yyyy', 'fr_FR').format(date);
+  UnpaidFilter _filter = UnpaidFilter.all;
+
+  String _formatDate(DateTime date) =>
+      DateFormat('dd/MM/yyyy', 'fr_FR').format(date);
+
+  String get _pdfTitle {
+    switch (_filter) {
+      case UnpaidFilter.all:
+        return 'Liste générale des étudiants';
+      case UnpaidFilter.moreThan1:
+        return 'Étudiants avec au moins 1 séance impayée';
+      case UnpaidFilter.moreThan4:
+        return 'Étudiants avec au moins 4 séances impayées';
+    }
   }
 
-  // Helper method to organize students by group
+  Map<String, List<StudentGroupInfo>> _applyFilter(
+      Map<String, List<StudentGroupInfo>> data) {
+    if (_filter == UnpaidFilter.all) return data;
+    final threshold = _filter == UnpaidFilter.moreThan1 ? 1 : 4;
+    return data.map((day, students) => MapEntry(
+          day,
+          students.where((s) => s.unpaidSessions >= threshold).toList(),
+        ));
+  }
+
   Map<String, List<StudentGroupInfo>> _organizeByGroup(
       List<StudentGroupInfo> students) {
-    Map<String, List<StudentGroupInfo>> groupedStudents = {};
-
-    // Sort students by group name first
+    final Map<String, List<StudentGroupInfo>> grouped = {};
     students.sort((a, b) => a.groupName.compareTo(b.groupName));
-
     for (var student in students) {
-      if (!groupedStudents.containsKey(student.groupName)) {
-        groupedStudents[student.groupName] = [];
-      }
-      groupedStudents[student.groupName]!.add(student);
+      grouped.putIfAbsent(student.groupName, () => []).add(student);
     }
-
-    return groupedStudents;
+    return grouped;
   }
 
   @override
@@ -55,174 +77,197 @@ class StudentsByDayScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: FutureBuilder<Map<String, List<StudentGroupInfo>>>(
-        future: DatabaseService().getStudentsByDay(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Erreur: ${snapshot.error}'));
-          }
-          if (!snapshot.hasData) {
-            return Center(child: Text('Aucun étudiant trouvé'));
-          }
+      body: Column(
+        children: [
+          _buildFilterBar(),
+          Expanded(
+            child: FutureBuilder<Map<String, List<StudentGroupInfo>>>(
+              future: DatabaseService().getStudentsByDay(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Erreur: ${snapshot.error}'));
+                }
+                if (!snapshot.hasData) {
+                  return const Center(child: Text('Aucun étudiant trouvé'));
+                }
 
-          final double cellWidth = MediaQuery.of(context).size.width * 0.25;
+                final filtered = _applyFilter(snapshot.data!);
+                final cellWidth = MediaQuery.of(context).size.width * 0.25;
 
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SingleChildScrollView(
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  dividerColor: Colors.black,
-                ),
-                child: DataTable(
-                  border: TableBorder.all(
-                    color: Colors.black,
-                    width: 1,
-                    style: BorderStyle.solid,
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    child: Theme(
+                      data: Theme.of(context)
+                          .copyWith(dividerColor: Colors.black),
+                      child: DataTable(
+                        border: TableBorder.all(
+                          color: Colors.black,
+                          width: 1,
+                          style: BorderStyle.solid,
+                        ),
+                        columnSpacing: 0,
+                        headingRowHeight: 60,
+                        dataRowMinHeight: 80,
+                        dataRowMaxHeight: 160,
+                        decoration:
+                            BoxDecoration(border: Border.all(color: Colors.black)),
+                        columns: daysOfWeek
+                            .map((day) => DataColumn(
+                                  label: Container(
+                                    width: cellWidth,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8),
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                          right: BorderSide(color: Colors.black)),
+                                    ),
+                                    child: Text(day,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                  ),
+                                ))
+                            .toList(),
+                        rows: _buildGroupedTableRows(filtered, cellWidth),
+                      ),
+                    ),
                   ),
-                  columnSpacing: 0,
-                  headingRowHeight: 60,
-                  dataRowMinHeight: 80,
-                  dataRowMaxHeight: 160,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.black),
-                  ),
-                  columns: daysOfWeek
-                      .map((day) => DataColumn(
-                            label: Container(
-                              width: cellWidth,
-                              padding: EdgeInsets.symmetric(horizontal: 8),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  right: BorderSide(color: Colors.black),
-                                ),
-                              ),
-                              child: Text(
-                                day,
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ))
-                      .toList(),
-                  rows: _buildGroupedTableRows(snapshot.data!, cellWidth),
-                ),
-              ),
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+      child: Row(
+        children: [
+          const Text('Afficher : ',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SegmentedButton<UnpaidFilter>(
+              segments: const [
+                ButtonSegment(
+                  value: UnpaidFilter.all,
+                  label: Text('Tous'),
+                  icon: Icon(Icons.list),
+                ),
+                ButtonSegment(
+                  value: UnpaidFilter.moreThan1,
+                  label: Text('>= 1 impayé'),
+                  icon: Icon(Icons.warning_amber_outlined),
+                ),
+                ButtonSegment(
+                  value: UnpaidFilter.moreThan4,
+                  label: Text('>= 4 impayés'),
+                  icon: Icon(Icons.error_outline),
+                ),
+              ],
+              selected: {_filter},
+              onSelectionChanged: (selection) =>
+                  setState(() => _filter = selection.first),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   List<DataRow> _buildGroupedTableRows(
       Map<String, List<StudentGroupInfo>> studentsByDay, double cellWidth) {
-    List<DataRow> allRows = [];
-
-    // Find the maximum number of groups and students per group across all days
     int maxRows = 0;
     for (var dayStudents in studentsByDay.values) {
-      var groupedStudents = _organizeByGroup(dayStudents);
+      final grouped = _organizeByGroup(dayStudents);
       int dayRows = 0;
-      for (var groupStudents in groupedStudents.values) {
-        dayRows += groupStudents.length + 1; // +1 for group header
+      for (var groupStudents in grouped.values) {
+        dayRows += groupStudents.length + 1;
       }
-      maxRows = maxRows < dayRows ? dayRows : maxRows;
+      if (dayRows > maxRows) maxRows = dayRows;
     }
 
-    // Build rows
-    for (int rowIndex = 0; rowIndex < maxRows; rowIndex++) {
-      allRows.add(DataRow(
+    return List.generate(maxRows, (rowIndex) {
+      return DataRow(
         cells: daysOfWeek.map((day) {
           final students = studentsByDay[day] ?? [];
-          final groupedStudents = _organizeByGroup(students);
+          final grouped = _organizeByGroup(students);
+          int pos = 0;
 
-          // Track current position in the day's data
-          int currentPosition = 0;
+          for (var entry in grouped.entries) {
+            final groupStudents = entry.value;
 
-          for (var entry in groupedStudents.entries) {
-            String groupName = entry.key;
-            List<StudentGroupInfo> groupStudents = entry.value;
+            if (pos == rowIndex) {
+              return DataCell(Container(
+                width: cellWidth,
+                padding: const EdgeInsets.all(8),
+                color: Colors.grey[200],
+                child: Text(entry.key,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ));
+            }
 
-            // Group header position
-            if (currentPosition == rowIndex) {
-              return DataCell(
-                Container(
-                  width: cellWidth,
-                  padding: EdgeInsets.all(8),
-                  color: Colors.grey[200],
-                  child: Text(
-                    groupName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      backgroundColor: Colors.grey[200],
+            if (rowIndex > pos && rowIndex <= pos + groupStudents.length) {
+              final info = groupStudents[rowIndex - pos - 1];
+              return DataCell(Container(
+                width: cellWidth,
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(info.student.nom,
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(info.lycee),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Non payées: ${info.unpaidSessions}',
+                      style: TextStyle(
+                        color: info.unpaidSessions >= 4
+                            ? Colors.red
+                            : Colors.green,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              );
+              ));
             }
 
-            // Student positions
-            if (rowIndex > currentPosition &&
-                rowIndex <= currentPosition + groupStudents.length) {
-              final studentInfo = groupStudents[rowIndex - currentPosition - 1];
-              return DataCell(
-                Container(
-                  width: cellWidth,
-                  padding: EdgeInsets.all(8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        studentInfo.student.nom,
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      SizedBox(height: 4),
-                      Text('${studentInfo.lycee}'),
-                      SizedBox(height: 4),
-                      Text(
-                        'Non payées: ${studentInfo.unpaidSessions}',
-                        style: TextStyle(
-                          color: studentInfo.unpaidSessions >= 4
-                              ? Colors.red
-                              : Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            currentPosition += groupStudents.length + 1;
+            pos += groupStudents.length + 1;
           }
 
           return DataCell(Container(width: cellWidth));
         }).toList(),
-      ));
-    }
-
-    return allRows;
+      );
+    });
   }
 
   Future<void> _generatePDF(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final pdf = pw.Document();
-      final studentsByDay = await DatabaseService().getStudentsByDay();
+      final raw = await DatabaseService().getStudentsByDay();
+      final studentsByDay = _applyFilter(raw);
 
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4.landscape,
-          build: (pw.Context context) {
+          build: (pw.Context ctx) {
             return [
               pw.Header(
                 level: 0,
                 child: pw.Text(
-                    'Liste des Étudiants par Jour ${_formatDate(DateTime.now())}',
-                    style: pw.TextStyle(fontSize: 20)),
+                  '${_pdfTitle} — ${_formatDate(DateTime.now())}',
+                  style: pw.TextStyle(fontSize: 18),
+                ),
               ),
               pw.SizedBox(height: 20),
               pw.Table(
@@ -231,7 +276,7 @@ class StudentsByDayScreen extends StatelessWidget {
                   pw.TableRow(
                     children: daysOfWeek
                         .map((day) => pw.Container(
-                              padding: pw.EdgeInsets.all(8),
+                              padding: const pw.EdgeInsets.all(8),
                               child: pw.Text(day,
                                   style: pw.TextStyle(
                                       fontWeight: pw.FontWeight.bold)),
@@ -257,102 +302,96 @@ class StudentsByDayScreen extends StatelessWidget {
       }
 
       if (directory != null) {
-        final int randomNumber = Random().nextInt(100000);
-        final String path =
-            '${directory.path}/etudiants_par_jour_$randomNumber.pdf';
-        final file = File(path);
-        await file.writeAsBytes(await pdf.save());
+        final randomNumber = Random().nextInt(100000);
+        final filterSuffix = _filter == UnpaidFilter.all
+            ? 'tous'
+            : _filter == UnpaidFilter.moreThan1
+                ? 'impayés_1'
+                : 'impayés_4';
+        final path =
+            '${directory.path}/etudiants_${filterSuffix}_$randomNumber.pdf';
+        await File(path).writeAsBytes(await pdf.save());
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        if (mounted) {
+          messenger.showSnackBar(SnackBar(
             content: Text('PDF sauvegardé: $path'),
-            duration: Duration(seconds: 3),
-          ),
-        );
+            duration: const Duration(seconds: 3),
+          ));
+        }
       } else {
-        throw Exception('Could not access storage directory');
+        throw Exception('Impossible d\'accéder au répertoire de stockage');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
           content: Text('Erreur: $e'),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
+          duration: const Duration(seconds: 3),
+        ));
+      }
     }
   }
 
   List<pw.TableRow> _buildGroupedPDFTableRows(
       Map<String, List<StudentGroupInfo>> studentsByDay) {
-    List<pw.TableRow> allRows = [];
-
-    // Calculate maximum rows needed
     int maxRows = 0;
     for (var dayStudents in studentsByDay.values) {
-      var groupedStudents = _organizeByGroup(dayStudents);
+      final grouped = _organizeByGroup(dayStudents);
       int dayRows = 0;
-      for (var groupStudents in groupedStudents.values) {
+      for (var groupStudents in grouped.values) {
         dayRows += groupStudents.length + 1;
       }
-      maxRows = maxRows < dayRows ? dayRows : maxRows;
+      if (dayRows > maxRows) maxRows = dayRows;
     }
 
-    // Build rows
-    for (int rowIndex = 0; rowIndex < maxRows; rowIndex++) {
-      allRows.add(pw.TableRow(
+    return List.generate(maxRows, (rowIndex) {
+      return pw.TableRow(
         children: daysOfWeek.map((day) {
           final students = studentsByDay[day] ?? [];
-          final groupedStudents = _organizeByGroup(students);
+          final grouped = _organizeByGroup(students);
+          int pos = 0;
 
-          int currentPosition = 0;
+          for (var entry in grouped.entries) {
+            final groupStudents = entry.value;
 
-          for (var entry in groupedStudents.entries) {
-            String groupName = entry.key;
-            List<StudentGroupInfo> groupStudents = entry.value;
-
-            if (currentPosition == rowIndex) {
+            if (pos == rowIndex) {
               return pw.Container(
-                padding: pw.EdgeInsets.all(8),
+                padding: const pw.EdgeInsets.all(8),
                 color: PdfColors.grey200,
-                child: pw.Text(
-                  groupName,
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
+                child: pw.Text(entry.key,
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
               );
             }
 
-            if (rowIndex > currentPosition &&
-                rowIndex <= currentPosition + groupStudents.length) {
-              final studentInfo = groupStudents[rowIndex - currentPosition - 1];
+            if (rowIndex > pos && rowIndex <= pos + groupStudents.length) {
+              final info = groupStudents[rowIndex - pos - 1];
               return pw.Container(
-                padding: pw.EdgeInsets.all(8),
+                padding: const pw.EdgeInsets.all(8),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
+                    pw.Text(info.student.nom,
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    pw.Text(info.lycee),
                     pw.Text(
-                      studentInfo.student.nom,
-                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      'Non payées: ${info.unpaidSessions}',
+                      style: pw.TextStyle(
+                        color: info.unpaidSessions >= 4
+                            ? PdfColors.red
+                            : PdfColors.green,
+                      ),
                     ),
-                    pw.Text(studentInfo.lycee),
-                    pw.Text('Non payées: ${studentInfo.unpaidSessions}',
-                        style: pw.TextStyle(
-                            color: studentInfo.unpaidSessions >= 4
-                                ? PdfColors.red
-                                : PdfColors.green))
                   ],
                 ),
               );
             }
 
-            currentPosition += groupStudents.length + 1;
+            pos += groupStudents.length + 1;
           }
 
-          return pw.Container(padding: pw.EdgeInsets.all(8));
+          return pw.Container(padding: const pw.EdgeInsets.all(8));
         }).toList(),
-      ));
-    }
-
-    return allRows;
+      );
+    });
   }
 }

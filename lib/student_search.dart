@@ -21,6 +21,7 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
   String? _selectedLycee;
   String? _selectedJour;
   bool _onlyUnpaid = false;
+  bool _onlyAnyUnpaid = false;
   bool _showFilters = false;
   List<String> _lycees = [];
 
@@ -32,6 +33,12 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
   void initState() {
     super.initState();
     _loadLycees();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<GroupeController>(context, listen: false)
+            .rechargerGroupes(context);
+      }
+    });
   }
 
   Future<void> _loadLycees() async {
@@ -446,7 +453,7 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
 
   Widget _buildFilterPanel() {
     final hasActiveFilters =
-        _selectedLycee != null || _selectedJour != null || _onlyUnpaid;
+        _selectedLycee != null || _selectedJour != null || _onlyUnpaid || _onlyAnyUnpaid;
     return Container(
       color: Theme.of(context).cardTheme.color ?? Colors.white,
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
@@ -503,7 +510,22 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                   ),
                 ),
               const SizedBox(width: 12),
-              // Unpaid filter
+              // Unpaid ≥1 filter
+              FilterChip(
+                avatar: Icon(Icons.warning_amber,
+                    size: 16,
+                    color: _onlyAnyUnpaid ? Colors.white : Colors.amber.shade700),
+                label: Text('Impayés ≥1',
+                    style: TextStyle(fontSize: 11,
+                        color: _onlyAnyUnpaid ? Colors.white : null)),
+                selected: _onlyAnyUnpaid,
+                selectedColor: Colors.amber.shade700,
+                showCheckmark: false,
+                onSelected: (val) =>
+                    setState(() => _onlyAnyUnpaid = val),
+              ),
+              const SizedBox(width: 8),
+              // Unpaid ≥4 filter
               FilterChip(
                 avatar: Icon(Icons.warning_amber,
                     size: 16,
@@ -527,6 +549,7 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
                   _selectedLycee = null;
                   _selectedJour = null;
                   _onlyUnpaid = false;
+                  _onlyAnyUnpaid = false;
                 }),
                 child: Text('✕ Réinitialiser les filtres',
                     style: TextStyle(
@@ -573,6 +596,13 @@ class _StudentSearchScreenState extends State<StudentSearchScreen> {
         final groupe = studentGroupMap[s.id];
         return groupe != null && groupe.jour == _selectedJour;
       }).toList();
+    }
+
+    // Apply unpaid filter (≥1)
+    if (_onlyAnyUnpaid) {
+      filteredStudents = filteredStudents
+          .where((s) => s.unpaidSessions >= 1)
+          .toList();
     }
 
     // Apply unpaid filter (≥4)

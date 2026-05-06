@@ -2,6 +2,7 @@ import 'package:calendrier_etude/models/custom_seance.dart';
 import 'package:calendrier_etude/models/etudiant_presence.dart';
 import 'package:calendrier_etude/services/database_service.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:uuid/uuid.dart';
@@ -15,6 +16,11 @@ class CalendarScreen extends StatefulWidget {
   @override
   _CalendarScreenState createState() => _CalendarScreenState();
 }
+
+// Appointment color constants — used both when creating and when checking type
+const Color _kSessionColor = Color(0xFF4F46E5);   // indigo — recorded session
+const Color _kPendingColor = Color(0xFFF43F5E);   // rose  — no data yet
+const Color _kCustomColor = Color(0xFF10B981);    // emerald — custom session
 
 class _CalendarScreenState extends State<CalendarScreen> {
   CalendarView _currentView = CalendarView.week;
@@ -147,7 +153,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Row(children: [
-            Icon(Icons.label_outline, size: 20, color: Color(0xFF2563EB)),
+            Icon(Icons.label_outline, size: 20, color: Color(0xFF4F46E5)),
             SizedBox(width: 8),
             Text('Nom de la séance'),
           ]),
@@ -181,34 +187,37 @@ class _CalendarScreenState extends State<CalendarScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Row(children: [
-            Icon(Icons.group_outlined, size: 20, color: Color(0xFF2563EB)),
+            Icon(Icons.group_outlined, size: 20, color: Color(0xFF4F46E5)),
             SizedBox(width: 8),
-            Text('Sélectionner un groupe'),
+            Expanded(child: Text('Sélectionner un groupe')),
           ]),
-          content: Container(
+          content: SizedBox(
             width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: groupeController.groupes.length,
-              itemBuilder: (context, index) {
-                final groupe = groupeController.groupes[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: const Color(0xFFEFF6FF),
-                    child: Text(
-                      groupe.nom[0].toUpperCase(),
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2563EB)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: groupeController.groupes.length,
+                itemBuilder: (context, index) {
+                  final groupe = groupeController.groupes[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: const Color(0xFFEFF6FF),
+                      child: Text(
+                        groupe.nom[0].toUpperCase(),
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF4F46E5)),
+                      ),
                     ),
-                  ),
-                  title: Text(groupe.nom),
-                  subtitle: Text(groupe.jour),
-                  onTap: () => Navigator.of(context).pop(groupe),
-                );
-              },
+                    title: Text(groupe.nom),
+                    subtitle: Text(groupe.jour),
+                    onTap: () => Navigator.of(context).pop(groupe),
+                  );
+                },
+              ),
             ),
           ),
           actions: [
@@ -353,7 +362,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             startTime: customSession.startTime,
             endTime: customSession.endTime,
             subject: '${groupe.nom} - ${customSession.name}',
-            color: Colors.green,
+            color: _kCustomColor,
             notes: groupe.id,
           ));
           continue; // Skip adding regular session
@@ -367,7 +376,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             subject: seanceInfo != null
                 ? '${groupe.nom} - ${seanceInfo['name']}'
                 : groupe.nom,
-            color: seanceInfo != null ? Colors.blue : Colors.red,
+            color: seanceInfo != null ? _kSessionColor : _kPendingColor,
             notes: groupe.id,
           ));
         }
@@ -398,7 +407,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           startTime: session.startTime,
           endTime: session.endTime,
           subject: '${groupe.nom} - ${session.name}',
-          color: Colors.green,
+          color: _kCustomColor,
           notes: groupe.id,
         ));
       }
@@ -409,53 +418,43 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Calendrier'),
+        title: Text(
+          'Calendrier',
+          style: GoogleFonts.manrope(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: isDark ? Colors.white : const Color(0xFF1E293B),
+          ),
+        ),
         actions: [
-          PopupMenuButton<CalendarView>(
-            icon: const Icon(Icons.calendar_view_week_outlined),
-            tooltip: 'Changer la vue',
-            initialValue: _currentView,
-            onSelected: (CalendarView newView) {
+          _ViewSwitcherButton(
+            currentView: _currentView,
+            isDark: isDark,
+            onViewSelected: (newView) {
               setState(() {
                 _currentView = newView;
                 _calendarController.view = newView;
               });
             },
-            itemBuilder: (BuildContext context) => [
-              const PopupMenuItem(
-                value: CalendarView.day,
-                child: Row(children: [
-                  Icon(Icons.calendar_view_day_outlined, size: 18),
-                  SizedBox(width: 8),
-                  Text('Vue journalière'),
-                ]),
-              ),
-              const PopupMenuItem(
-                value: CalendarView.week,
-                child: Row(children: [
-                  Icon(Icons.calendar_view_week_outlined, size: 18),
-                  SizedBox(width: 8),
-                  Text('Vue semaine'),
-                ]),
-              ),
-              const PopupMenuItem(
-                value: CalendarView.month,
-                child: Row(children: [
-                  Icon(Icons.calendar_month_outlined, size: 18),
-                  SizedBox(width: 8),
-                  Text('Vue mois'),
-                ]),
-              ),
-            ],
           ),
+          const SizedBox(width: 4),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addCustomSession(context),
-        child: const Icon(Icons.add),
-        tooltip: 'Ajouter une séance personnalisée',
+        icon: const Icon(Icons.add_rounded),
+        label: Text(
+          'Séance',
+          style: GoogleFonts.manrope(fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        backgroundColor: const Color(0xFF4F46E5),
+        foregroundColor: Colors.white,
+        elevation: 3,
       ),
       body: Consumer<GroupeController>(
         builder: (context, groupeController, child) {
@@ -464,11 +463,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const CircularProgressIndicator(),
+                  const CircularProgressIndicator(
+                    color: Color(0xFF4F46E5),
+                    strokeWidth: 2.5,
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    'Chargement du calendrier...',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    'Chargement du calendrier…',
+                    style: GoogleFonts.manrope(
+                      color: const Color(0xFF64748B),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -486,26 +492,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       width: 80,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
+                        color: const Color(0xFFEEF2FF),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Icon(Icons.event_note_outlined,
-                          size: 40, color: Color(0xFF2563EB)),
+                          size: 38, color: Color(0xFF4F46E5)),
                     ),
                     const SizedBox(height: 20),
                     Text(
                       'Aucun groupe',
-                      style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.onSurface),
+                      style: GoogleFonts.manrope(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1E293B),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Créez d\'abord un groupe pour voir\nles séances dans le calendrier',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: 14, color: Colors.grey.shade600),
+                      style: GoogleFonts.manrope(
+                        fontSize: 14,
+                        color: const Color(0xFF64748B),
+                        height: 1.5,
+                      ),
                     ),
                   ],
                 ),
@@ -513,36 +523,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
             );
           }
 
-          final isDark = Theme.of(context).brightness == Brightness.dark;
           final calTextColor = isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B);
           final calHeaderColor = isDark ? Colors.white : const Color(0xFF1E293B);
           final calBg = isDark ? const Color(0xFF1E1E2E) : Colors.white;
-          final calCellBg = isDark ? const Color(0xFF121220) : Colors.white;
+          final calCellBg = isDark ? const Color(0xFF121220) : const Color(0xFFF7F9FB);
+          final calBorderColor = isDark ? const Color(0xFF2A2A3E) : const Color(0xFFF2F4F6);
 
           return SfCalendar(
             controller: _calendarController,
             view: _currentView,
             dataSource: MeetingDataSource(_appointments),
             backgroundColor: calCellBg,
-            cellBorderColor: isDark ? const Color(0xFF2A2A3E) : null,
+            cellBorderColor: calBorderColor,
             timeSlotViewSettings: TimeSlotViewSettings(
               startHour: 7,
               endHour: 23,
               timeFormat: 'HH:mm',
-              timeTextStyle: TextStyle(
+              timeIntervalHeight: 52,
+              timeTextStyle: GoogleFonts.manrope(
                 fontSize: 11,
+                fontWeight: FontWeight.w500,
                 color: calTextColor,
               ),
             ),
             viewHeaderStyle: ViewHeaderStyle(
               backgroundColor: calBg,
-              dayTextStyle: TextStyle(
+              dayTextStyle: GoogleFonts.manrope(
                 fontSize: 10,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
                 color: calTextColor,
+                letterSpacing: 0.8,
               ),
-              dateTextStyle: TextStyle(
-                fontSize: 14,
+              dateTextStyle: GoogleFonts.manrope(
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: calHeaderColor,
               ),
@@ -552,28 +565,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             headerStyle: CalendarHeaderStyle(
               backgroundColor: calBg,
-              textStyle: TextStyle(
+              textStyle: GoogleFonts.manrope(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: calHeaderColor,
+                letterSpacing: -0.2,
               ),
             ),
             headerDateFormat: 'MMMM yyyy',
-            todayHighlightColor: const Color(0xFF2563EB),
-            todayTextStyle: const TextStyle(
+            todayHighlightColor: const Color(0xFF4F46E5),
+            todayTextStyle: GoogleFonts.manrope(
               color: Colors.white,
               fontWeight: FontWeight.w700,
+              fontSize: 13,
             ),
             selectionDecoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF2563EB), width: 2),
-              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFF4F46E5), width: 2),
+              borderRadius: BorderRadius.circular(6),
             ),
             firstDayOfWeek: 1,
             onTap: (CalendarTapDetails details) async {
               if (details.appointments != null &&
                   details.appointments!.isNotEmpty) {
-                final appointment =
-                    details.appointments!.first as Appointment;
+                final appointment = details.appointments!.first as Appointment;
                 final groupe = groupeController.groupes
                     .firstWhere((g) => g.id == appointment.notes);
 
@@ -600,8 +614,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
             onLongPress: (CalendarLongPressDetails details) async {
               if (details.appointments != null &&
                   details.appointments!.isNotEmpty) {
-                final appointment =
-                    details.appointments!.first as Appointment;
+                final appointment = details.appointments!.first as Appointment;
+                final isCustom = appointment.color == _kCustomColor;
 
                 await showDialog(
                   context: context,
@@ -609,65 +623,97 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     return AlertDialog(
                       title: Row(
                         children: [
-                          Icon(Icons.more_horiz, color: Colors.grey.shade600),
-                          const SizedBox(width: 8),
-                          const Text('Options de la séance'),
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF2F4F6),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.tune_rounded,
+                                size: 16, color: Color(0xFF64748B)),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Options de la séance',
+                            style: GoogleFonts.manrope(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1E293B),
+                            ),
+                          ),
                         ],
                       ),
                       content: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (appointment.color == Colors.green)
-                            ListTile(
-                              leading: Icon(Icons.delete_outline,
-                                  color: Colors.red.shade400),
-                              title: const Text('Supprimer la séance'),
-                              contentPadding: EdgeInsets.zero,
-                              onTap: () async {
-                                Navigator.of(context).pop('delete');
-                              },
+                          if (isCustom)
+                            _OptionTile(
+                              icon: Icons.delete_outline_rounded,
+                              iconColor: const Color(0xFFF43F5E),
+                              iconBg: const Color(0xFFFFF1F2),
+                              label: 'Supprimer la séance',
+                              onTap: () => Navigator.of(context).pop('delete'),
                             ),
-                          if (appointment.color != Colors.green)
-                            ListTile(
-                              leading: Icon(Icons.visibility_off_outlined,
-                                  color: Colors.orange.shade600),
-                              title: const Text('Masquer cette séance'),
-                              contentPadding: EdgeInsets.zero,
-                              onTap: () async {
-                                Navigator.of(context).pop('hide');
-                              },
+                          if (!isCustom)
+                            _OptionTile(
+                              icon: Icons.visibility_off_outlined,
+                              iconColor: const Color(0xFFF59E0B),
+                              iconBg: const Color(0xFFFFFBEB),
+                              label: 'Masquer cette séance',
+                              onTap: () => Navigator.of(context).pop('hide'),
                             ),
                         ],
                       ),
                     );
                   },
                 ).then((result) async {
+                  if (!mounted) return;
                   if (result == 'delete') {
                     final shouldDelete = await showDialog<bool>(
                       context: context,
                       builder: (BuildContext context) {
                         return AlertDialog(
                           title: Row(children: [
-                            Icon(Icons.warning_amber_rounded,
-                                color: Colors.red.shade400, size: 22),
-                            const SizedBox(width: 8),
-                            const Text('Supprimer la séance'),
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF1F2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.warning_amber_rounded,
+                                  size: 16, color: Color(0xFFF43F5E)),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Supprimer la séance',
+                              style: GoogleFonts.manrope(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
                           ]),
-                          content: const Text(
-                              'Êtes-vous sûr de vouloir supprimer cette séance personnalisée ?'),
+                          content: Text(
+                            'Êtes-vous sûr de vouloir supprimer cette séance personnalisée ?',
+                            style: GoogleFonts.manrope(
+                              fontSize: 14,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
                           actions: [
                             TextButton(
                               child: const Text('Annuler'),
-                              onPressed: () =>
-                                  Navigator.of(context).pop(false),
+                              onPressed: () => Navigator.of(context).pop(false),
                             ),
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white),
+                                backgroundColor: const Color(0xFFF43F5E),
+                                foregroundColor: Colors.white,
+                              ),
                               child: const Text('Supprimer'),
-                              onPressed: () =>
-                                  Navigator.of(context).pop(true),
+                              onPressed: () => Navigator.of(context).pop(true),
                             ),
                           ],
                         );
@@ -677,13 +723,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     if (shouldDelete == true) {
                       final customSessions =
                           await DatabaseService().getCustomSeances();
-
                       final session = customSessions.firstWhere((s) =>
                           s.startTime == appointment.startTime &&
                           s.endTime == appointment.endTime);
                       await _deleteCustomSession(session);
                     }
                   } else if (result == 'hide') {
+                    if (!mounted) return;
                     final groupe = groupeController.groupes
                         .firstWhere((g) => g.id == appointment.notes);
                     await DatabaseService()
@@ -733,25 +779,157 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return occurrences;
   }
 
-  String _getDayName(int weekday) {
-    switch (weekday) {
-      case DateTime.monday:
-        return 'Lundi';
-      case DateTime.tuesday:
-        return 'Mardi';
-      case DateTime.wednesday:
-        return 'Mercredi';
-      case DateTime.thursday:
-        return 'Jeudi';
-      case DateTime.friday:
-        return 'Vendredi';
-      case DateTime.saturday:
-        return 'Samedi';
-      case DateTime.sunday:
-        return 'Dimanche';
+}
+
+class _ViewSwitcherButton extends StatelessWidget {
+  const _ViewSwitcherButton({
+    required this.currentView,
+    required this.isDark,
+    required this.onViewSelected,
+  });
+
+  final CalendarView currentView;
+  final bool isDark;
+  final ValueChanged<CalendarView> onViewSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final views = [
+      (CalendarView.day, Icons.calendar_view_day_outlined, 'Journalier'),
+      (CalendarView.week, Icons.calendar_view_week_outlined, 'Semaine'),
+      (CalendarView.month, Icons.calendar_month_outlined, 'Mois'),
+    ];
+
+    return PopupMenuButton<CalendarView>(
+      tooltip: 'Changer la vue',
+      initialValue: currentView,
+      onSelected: onViewSelected,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: isDark ? const Color(0xFF2A2A3E) : Colors.white,
+      offset: const Offset(0, 8),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2A2A3E) : const Color(0xFFF2F4F6),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 16,
+              color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              _labelFor(currentView),
+              style: GoogleFonts.manrope(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
+              ),
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (_) => views.map((v) {
+        final (view, icon, label) = v;
+        final isActive = currentView == view;
+        return PopupMenuItem(
+          value: view,
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isActive
+                    ? const Color(0xFF4F46E5)
+                    : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF64748B)),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: GoogleFonts.manrope(
+                  fontSize: 13,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  color: isActive
+                      ? const Color(0xFF4F46E5)
+                      : (isDark ? Colors.white : const Color(0xFF1E293B)),
+                ),
+              ),
+              if (isActive) ...[
+                const Spacer(),
+                const Icon(Icons.check_rounded, size: 14, color: Color(0xFF4F46E5)),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _labelFor(CalendarView view) {
+    switch (view) {
+      case CalendarView.day:
+        return 'Jour';
+      case CalendarView.week:
+        return 'Semaine';
+      case CalendarView.month:
+        return 'Mois';
       default:
-        return '';
+        return 'Vue';
     }
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  const _OptionTile({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: GoogleFonts.manrope(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

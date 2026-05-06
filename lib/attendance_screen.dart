@@ -129,27 +129,31 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           if (etudiant != null && !etudiant.isGratuit) {
             int unpaidSessions = etudiant.unpaidSessions;
             if (seance.present) {
-              // Only increment if it's a new present record
               if (originalPresent == null || !originalPresent) {
                 unpaidSessions += 1;
               }
             } else {
-              // Only decrement if changing from present to absent
               if (originalPresent == true) {
                 unpaidSessions -= 1;
               }
             }
             etudiant.unpaidSessions = unpaidSessions;
 
-            // Get the student's original group ID
             String? originalGroupId = await _databaseService
                 .findStudentOriginalGroup(seance.etudiantId);
             if (originalGroupId != null) {
-              // Update the student while preserving their original group
               await _databaseService.updateEtudiantUnpaidSessions(
                   etudiant, originalGroupId);
             }
           }
+        }
+      }
+
+      // Delete seances that were removed locally but still exist in the DB.
+      // deleteSeance already handles the unpaidSessions decrement internally.
+      for (var original in originalSeances) {
+        if (!_seanceMap.containsKey(original.etudiantId)) {
+          await _databaseService.deleteSeance(original.etudiantId, widget.date);
         }
       }
 
@@ -165,16 +169,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         );
       }
 
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _hasChanges = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Présence sauvegardée')),
+        const SnackBar(content: Text('Présence sauvegardée')),
       );
     } catch (e) {
-      print('Error saving seances: $e');
       if (!mounted) return;
 
       setState(() {
@@ -182,16 +186,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la sauvegarde')),
+        const SnackBar(content: Text('Erreur lors de la sauvegarde')),
       );
     }
   }
 
   Future<void> _addExternalStudent() async {
-    final List<Etudiant>? availableStudents =
+    final List<Etudiant> availableStudents =
         await _databaseService.getAllEtudiants();
 
-    if (availableStudents == null || !mounted) return;
+    if (!mounted) return;
 
     final filteredStudents = availableStudents
         .where((student) =>
@@ -291,7 +295,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       setState(() {
         _externalStudents[selectedStudent.id] = selectedStudent;
         _seanceMap[selectedStudent.id] = Seance(
-          id: Uuid().v4(),
+          id: const Uuid().v4(),
           date: widget.date,
           etudiantId: selectedStudent.id,
           present: true,
@@ -388,7 +392,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Widget _buildContent() {
     if (!_dataLoaded) {
-      return Center(child: Text('Aucune donnée disponible'));
+      return const Center(child: Text('Aucune donnée disponible'));
     }
 
     final int presentCount = _seanceMap.values.where((s) => s.present).length;
@@ -565,7 +569,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -601,64 +605,65 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
           color: isPresent
-              ? const Color(0xFF10B981).withOpacity(0.4)
+              ? const Color(0xFF10B981).withValues(alpha: 0.4)
               : Colors.grey.shade200,
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: isPresent
-                  ? const Color(0xFF10B981).withOpacity(0.15)
-                  : Colors.grey.shade100,
-              child: Text(
-                initials,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: isPresent
-                      ? const Color(0xFF10B981)
-                      : Colors.grey.shade500,
+      child: InkWell(
+        onTap: onToggle,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: isPresent
+                    ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                    : Colors.grey.shade100,
+                child: Text(
+                  initials,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isPresent
+                        ? const Color(0xFF10B981)
+                        : Colors.grey.shade500,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isPresent
-                          ? const Color(0xFF065F46)
-                          : Theme.of(context).colorScheme.onSurface,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isPresent
+                            ? const Color(0xFF065F46)
+                            : Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
-                  ),
-                  if (isExternal)
-                    Text('Externe',
-                        style: TextStyle(
-                            fontSize: 11, color: Colors.purple.shade400)),
-                ],
+                    if (isExternal)
+                      Text('Externe',
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.purple.shade400)),
+                  ],
+                ),
               ),
-            ),
-            if (onRemove != null)
-              IconButton(
-                icon: Icon(Icons.remove_circle_outline,
-                    color: Colors.red.shade400, size: 18),
-                onPressed: onRemove,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: onToggle,
-              child: AnimatedContainer(
+              if (onRemove != null)
+                IconButton(
+                  icon: Icon(Icons.remove_circle_outline,
+                      color: Colors.red.shade400, size: 18),
+                  onPressed: onRemove,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              const SizedBox(width: 8),
+              AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 width: 36,
                 height: 36,
@@ -674,77 +679,31 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   size: 20,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _toggleAttendance(String etudiantId) async {
+  void _toggleAttendance(String etudiantId) {
     if (_isLoading) return;
 
-    var seance = _seanceMap[etudiantId];
-    if (seance == null) {
-      // Create new seance (marked as present)
-      setState(() {
+    setState(() {
+      final seance = _seanceMap[etudiantId];
+      if (seance == null || !seance.present) {
         _seanceMap[etudiantId] = Seance(
-          id: Uuid().v4(),
+          id: seance?.id ?? const Uuid().v4(),
           date: widget.date,
           etudiantId: etudiantId,
           present: true,
           name: _sessionName,
         );
-        _hasChanges = true;
-      });
-    } else {
-      if (seance.present) {
-        // If currently present, delete the seance
-        try {
-          setState(() {
-            _isLoading = true;
-          });
-
-          await _databaseService.deleteSeance(etudiantId, widget.date);
-
-          setState(() {
-            _seanceMap.remove(etudiantId);
-            _hasChanges = false; // No need to save since we've already deleted
-            _isLoading = false;
-          });
-
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Présence supprimée')),
-          );
-        } catch (e) {
-          print('Error toggling attendance: $e');
-          setState(() {
-            _isLoading = false;
-          });
-
-          // Show error message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur lors de la suppression de la présence'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
       } else {
-        // If currently absent, mark as present
-        setState(() {
-          _seanceMap[etudiantId] = Seance(
-            id: seance.id,
-            date: seance.date,
-            etudiantId: seance.etudiantId,
-            present: true,
-            name: _sessionName,
-          );
-          _hasChanges = true;
-        });
+        _seanceMap.remove(etudiantId);
       }
-    }
+      _hasChanges = true;
+    });
   }
 
 
@@ -761,13 +720,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             tooltip: 'Modifier le nom de la séance',
           ),
           if (_hasChanges && !_isLoading)
-            TextButton.icon(
-              icon: const Icon(Icons.save_outlined,
-                  size: 18, color: Colors.white),
-              label: const Text('Sauvegarder',
-                  style: TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600)),
-              onPressed: _saveChanges,
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: const Text('Sauvegarder'),
+                onPressed: _saveChanges,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
             ),
         ],
       ),
